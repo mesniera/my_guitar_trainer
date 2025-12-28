@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitar Trainer Pro</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Application d'entraînement pour guitare avec détection audio en temps réel">
+    <meta name="theme-color" content="#00d4aa">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Guitar Trainer">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #151a23;
+            --bg-tertiary: #1f2937;
+            --accent-primary: #00d4aa;
+            --accent-secondary: #00a8ff;
+            --accent-danger: #ff3366;
+            --accent-warning: #ffaa00;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --border: #30363d;
+            --success: #3fb950;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, #0d1117 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        h1 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.25rem;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .settings-panel {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+            height: fit-content;
+            position: sticky;
+            top: 1rem;
+        }
+
+        .section-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent-primary);
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        .mode-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .mode-btn {
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.75rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+
+        .mode-btn:hover {
+            border-color: var(--accent-primary);
+            transform: translateX(4px);
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border-color: transparent;
+            color: var(--bg-primary);
+        }
+
+        .setting-group {
+            margin-bottom: 1rem;
+        }
+
+        .setting-label {
+            display: block;
+            color: var(--text-secondary);
+            margin-bottom: 0.4rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            padding: 0.4rem;
+            border-radius: 6px;
+            transition: background 0.2s;
+            font-size: 0.85rem;
+        }
+
+        .checkbox-label:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .chord-types-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.3rem;
+        }
+
+        .chord-only-section {
+            display: block;
+        }
+
+        .chord-only-section.hidden {
+            display: none;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--accent-primary);
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            -moz-appearance: textfield;
+        }
+
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .display-panel {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+            height: fit-content;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .exercise-display {
+            text-align: center;
+        }
+
+        .timer-display {
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            border: 2px solid var(--border);
+            display: inline-block;
+        }
+
+        .timer-label {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.25rem;
+        }
+
+        .timer-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-primary);
+        }
+
+        .timer-value.warning {
+            color: var(--accent-warning);
+            animation: timerPulse 0.5s infinite;
+        }
+
+        .timer-value.danger {
+            color: var(--accent-danger);
+            animation: timerPulse 0.3s infinite;
+        }
+
+        @keyframes timerPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .current-note {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 3rem;
+            font-weight: 700;
+            margin: 0.75rem 0;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+        }
+
+        .note-notation {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .notation {
+            text-align: center;
+        }
+
+        .notation-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.25rem;
+        }
+
+        .notation-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .chord-notes-display {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            border: 2px solid var(--border);
+        }
+
+        .chord-display-wrapper {
+            display: flex;
+            gap: 2rem;
+            align-items: flex-start;
+            justify-content: center;
+        }
+
+        .chord-notes-section {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 200px;
+        }
+
+        .chord-notes-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+
+        .chord-notes-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            color: var(--accent-primary);
+            font-weight: 600;
+            text-align: left;
+            line-height: 1.6;
+        }
+
+        .chord-diagram-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .diagram-header {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .chord-diagram-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            text-align: center;
+        }
+
+        .diagram-navigation {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .diagram-nav-btn {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--accent-primary);
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .diagram-nav-btn:hover:not(:disabled) {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .diagram-nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .position-indicator {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .chord-diagram {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .diagram-fret-info {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .diagram-grid {
+            position: relative;
+            display: inline-block;
+        }
+
+        .diagram-string {
+            display: flex;
+            align-items: center;
+            gap: 0;
+        }
+
+        .diagram-string-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            width: 30px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .diagram-fret {
+            width: 45px;
+            height: 30px;
+            border: 1px solid var(--border);
+            border-left: none;
+            border-top: none;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .diagram-fret:first-of-type {
+            border-left: 3px solid var(--text-primary);
+        }
+
+        .diagram-string:first-child .diagram-fret {
+            border-top: 1px solid var(--border);
+        }
+
+        .diagram-finger {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 700;
+            box-shadow: 0 0 10px rgba(0, 212, 170, 0.4);
+        }
+
+        .diagram-open {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid var(--success);
+            background: transparent;
+        }
+
+        .diagram-muted {
+            color: var(--accent-danger);
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .diagram-legend {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .fret-numbers {
+            display: flex;
+            margin-top: 0.5rem;
+            padding-left: 30px;
+        }
+
+        .fret-number {
+            width: 45px;
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+
+        .btn {
+            padding: 0.6rem 1.25rem;
+            border: none;
+            border-radius: 10px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: var(--bg-primary);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 212, 170, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 2px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .audio-detector {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            border: 2px solid var(--border);
+        }
+
+        .audio-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+        }
+
+        .status-indicator.active {
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .detected-note {
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-top: 0.35rem;
+        }
+
+        .detected-note.correct {
+            color: var(--success);
+            animation: correctFlash 0.6s ease-in-out;
+            font-weight: 700;
+        }
+
+        .detected-note.incorrect {
+            color: var(--accent-danger);
+        }
+
+        @keyframes correctFlash {
+            0%, 100% { 
+                transform: scale(1);
+                text-shadow: none;
+            }
+            50% { 
+                transform: scale(1.3);
+                text-shadow: 0 0 30px var(--success), 0 0 60px var(--success);
+            }
+        }
+
+        .frequency-display {
+            text-align: center;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .settings-panel {
+                position: static;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .current-note {
+                font-size: 3rem;
+            }
+
+            .chord-display-wrapper {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .chord-notes-section {
+                text-align: center;
+                min-height: auto;
+            }
+
+            .chord-notes-label,
+            .chord-notes-value {
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>GUITAR TRAINER PRO</h1>
+            <p class="subtitle">Entraînement avancé avec détection audio</p>
+        </header>
+
+        <div class="main-grid">
+            <!-- Settings Panel -->
+            <div class="settings-panel">
+                <div class="section-title">Mode d'exercice</div>
+                <div class="mode-selector">
+                    <button class="mode-btn active" data-mode="single">
+                        📍 Notes individuelles
+                    </button>
+                </div>
+
+                <div class="section-title">Détection audio</div>
+                <div class="setting-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="enableAudio">
+                        <span>Activer le microphone</span>
+                    </label>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">Délai avant passage (secondes)</label>
+                    <input type="number" id="advanceDelay" min="0.5" max="5" step="0.5" value="1.5">
+                </div>
+                
+                <div class="section-title">Lecture audio</div>
+                <div class="setting-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="playSoundCheckbox" checked>
+                        <span>Jouer le son de la note</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Display Panel -->
+            <div class="display-panel">
+                <div class="exercise-display">
+                    <div class="current-note" id="currentNote">—</div>
+                    
+                    <div class="note-notation">
+                        <div class="notation">
+                            <div class="notation-label">Internationale</div>
+                            <div class="notation-value" id="intlNotation">—</div>
+                        </div>
+                        <div class="notation">
+                            <div class="notation-label">Française</div>
+                            <div class="notation-value" id="frNotation">—</div>
+                        </div>
+                    </div>
+
+                    <div class="chord-notes-display" id="chordNotesDisplay" style="display: none;">
+                        <div class="chord-display-wrapper">
+                            <div class="chord-notes-section">
+                                <div class="chord-notes-label">Notes de l'accord</div>
+                                <div class="chord-notes-value" id="chordNotesValue">—</div>
+                            </div>
+                            <div class="chord-diagram-section" id="chordDiagramContainer">
+                                <div class="diagram-header">
+                                    <div class="chord-diagram-label">Position sur le manche</div>
+                                    <div class="diagram-navigation">
+                                        <button class="diagram-nav-btn" id="prevPositionBtn">←</button>
+                                        <span class="position-indicator" id="positionIndicator">1/1</span>
+                                        <button class="diagram-nav-btn" id="nextPositionBtn">→</button>
+                                    </div>
+                                </div>
+                                <div class="chord-diagram" id="chordDiagram"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-buttons">
+                        <button class="btn btn-primary" id="nextBtn">
+                            ▶ Suivant
+                        </button>
+                        <button class="btn btn-secondary" id="resetBtn">
+                            ⟳ Réinitialiser
+                        </button>
+                    </div>
+
+                    <div class="audio-detector" id="audioDetector" style="display: none;">
+                        <div class="audio-status">
+                            <div class="status-indicator" id="statusIndicator"></div>
+                            <span id="statusText">Microphone désactivé</span>
+                        </div>
+                        <div class="detected-note" id="detectedNote">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Note mappings
+        const noteToFrench = {
+            'C': 'Do', 'C#': 'Do#', 'Db': 'Réb', 'D': 'Ré', 'D#': 'Ré#', 
+            'Eb': 'Mib', 'E': 'Mi', 'F': 'Fa', 'F#': 'Fa#', 'Gb': 'Solb',
+            'G': 'Sol', 'G#': 'Sol#', 'Ab': 'Lab', 'A': 'La', 'A#': 'La#',
+            'Bb': 'Sib', 'B': 'Si'
+        };
+
+        const allNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        
+        // Chord types with their intervals (in semitones from root)
+        const chordTypes = {
+            'Majeur': { suffix: '', intervals: [0, 4, 7], french: 'Majeur' },
+            'Mineur': { suffix: 'm', intervals: [0, 3, 7], french: 'Mineur' },
+            '7': { suffix: '7', intervals: [0, 4, 7, 10], french: 'Septième' },
+            'Maj7': { suffix: 'Maj7', intervals: [0, 4, 7, 11], french: 'Septième Majeure' },
+            'm7': { suffix: 'm7', intervals: [0, 3, 7, 10], french: 'Mineur Septième' },
+            'dim': { suffix: 'dim', intervals: [0, 3, 6], french: 'Diminué' },
+            'aug': { suffix: 'aug', intervals: [0, 4, 8], french: 'Augmenté' },
+            'sus4': { suffix: 'sus4', intervals: [0, 5, 7], french: 'Suspendu 4' },
+            'sus2': { suffix: 'sus2', intervals: [0, 2, 7], french: 'Suspendu 2' }
+        };
+
+        // State
+        let currentMode = 'single';
+        let currentExercise = null;
+        let audioContext = null;
+        let analyser = null;
+        let microphone = null;
+        let isListening = false;
+        let usedNotes = [];
+        let availableNotes = [];
+        let usedChords = [];
+        let availableChords = [];
+        let currentChordPositionIndex = 0;
+        let currentChordName = null;
+        let lastDetectedNote = null;
+        let noteDetectionStartTime = 0;
+        let stableNoteDuration = 200; // 200 milliseconds
+        let hasAutoAdvanced = false;
+        let waitingForRelease = false;
+        let wakeLock = null;
+        let audioContextSynth = null;
+        let playNoteSound = true; // Toggle to enable/disable sound playback
+
+        // Elements
+        const modeButtons = document.querySelectorAll('.mode-btn');
+        const nextBtn = document.getElementById('nextBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const currentNoteEl = document.getElementById('currentNote');
+        const intlNotationEl = document.getElementById('intlNotation');
+        const frNotationEl = document.getElementById('frNotation');
+        const detectedNoteEl = document.getElementById('detectedNote');
+        const enableAudioCheckbox = document.getElementById('enableAudio');
+        const audioDetector = document.getElementById('audioDetector');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const advanceDelayInput = document.getElementById('advanceDelay');
+        const playSoundCheckbox = document.getElementById('playSoundCheckbox');
+
+        // Chord shapes database - format: [fret positions for strings 1-6 (e to E), finger numbers]
+        // -1 = muted, 0 = open string
+        // Each chord can have multiple positions (array of shapes)
+        const chordShapes = {
+            'C': [
+                { frets: [0, 1, 0, 2, 3, -1], fingers: [0, 1, 0, 2, 3, 0], baseFret: 0, name: 'Position ouverte' },
+                { frets: [5, 5, 5, 7, 8, 8], fingers: [1, 1, 1, 2, 3, 4], baseFret: 0, name: 'Barré en 3' },
+                { frets: [8, 8, 9, 10, 10, 8], fingers: [1, 1, 2, 3, 4, 1], baseFret: 0, name: 'Barré en 8' }
+            ],
+            'Cm': [
+                { frets: [3, 4, 5, 5, 3, -1], fingers: [1, 2, 4, 3, 1, 0], baseFret: 0, name: 'Barré en 3' },
+                { frets: [8, 8, 8, 10, 11, 11], fingers: [1, 1, 1, 2, 3, 4], baseFret: 0, name: 'Barré en 8' }
+            ],
+            'C7': [
+                { frets: [0, 1, 3, 2, 3, -1], fingers: [0, 1, 4, 2, 3, 0], baseFret: 0, name: 'Position ouverte' },
+                { frets: [5, 5, 5, 7, 6, 8], fingers: [1, 1, 1, 4, 2, 3], baseFret: 0, name: 'Barré en 3' }
+            ],
+            'CMaj7': [
+                { frets: [0, 0, 0, 2, 3, -1], fingers: [0, 0, 0, 2, 3, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Cm7': [
+                { frets: [3, 1, 3, 1, 3, -1], fingers: [2, 1, 4, 1, 3, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Cdim': [
+                { frets: [2, 4, 2, 4, 3, -1], fingers: [1, 3, 1, 4, 2, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Caug': [
+                { frets: [0, 1, 1, 2, 3, -1], fingers: [0, 2, 1, 3, 4, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Csus4': [
+                { frets: [1, 1, 0, 3, 3, -1], fingers: [2, 1, 0, 4, 3, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Csus2': [
+                { frets: [3, 3, 0, 0, 3, -1], fingers: [4, 3, 0, 0, 2, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            
+            'D': [
+                { frets: [2, 3, 2, 0, -1, -1], fingers: [2, 3, 1, 0, 0, 0], baseFret: 0, name: 'Position ouverte' },
+                { frets: [7, 7, 7, 9, 10, 10], fingers: [1, 1, 1, 2, 3, 4], baseFret: 0, name: 'Barré en 5' },
+                { frets: [10, 10, 11, 12, 12, 10], fingers: [1, 1, 2, 3, 4, 1], baseFret: 0, name: 'Barré en 10' }
+            ],
+            'Dm': [
+                { frets: [1, 3, 2, 0, -1, -1], fingers: [1, 3, 2, 0, 0, 0], baseFret: 0, name: 'Position ouverte' },
+                { frets: [5, 6, 7, 7, 5, -1], fingers: [1, 2, 4, 3, 1, 0], baseFret: 0, name: 'Barré en 5' },
+                { frets: [10, 10, 10, 12, 13, 13], fingers: [1, 1, 1, 2, 3, 4], baseFret: 0, name: 'Barré en 10' }
+            ],
+            'D7': [
+                { frets: [2, 1, 2, 0, -1, -1], fingers: [3, 1, 2, 0, 0, 0], baseFret: 0, name: 'Position ouverte' },
+                { frets: [7, 7, 7, 9, 8, 10], fingers: [1, 1, 1, 4, 2, 3], baseFret: 0, name: 'Barré en 5' }
+            ],
+            'DMaj7': [
+                { frets: [2, 2, 2, 0, -1, -1], fingers: [1, 1, 1, 0, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Dm7': [
+                { frets: [1, 1, 2, 0, -1, -1], fingers: [1, 1, 2, 0, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Ddim': [
+                { frets: [1, 0, 1, 0, -1, -1], fingers: [2, 0, 1, 0, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Daug': [
+                { frets: [2, 3, 3, 0, -1, -1], fingers: [1, 3, 2, 0, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Dsus4': [
+                { frets: [3, 3, 2, 0, -1, -1], fingers: [4, 3, 1, 0, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Dsus2': [
+                { frets: [0, 3, 2, 0, -1, -1], fingers: [0, 2, 1, 0, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            
+            'E': [
+                { frets: [0, 0, 1, 2, 2, 0], fingers: [0, 0, 1, 3, 2, 0], baseFret: 0, name: 'Position ouverte' },
+                { frets: [4, 4, 5, 6, 6, 4], fingers: [1, 1, 2, 3, 4, 1], baseFret: 0, name: 'Barré en 4' },
+                { frets: [7, 7, 9, 9, 9, 7], fingers: [1, 1, 2, 3, 4, 1], baseFret: 0, name: 'Barré en 7' }
+            ],
+            'Em': [
+                { frets: [0, 0, 0, 2, 2, 0], fingers: [0, 0, 0, 3, 2, 0], baseFret: 0, name: 'Position ouverte' },
+                { frets: [7, 8, 9, 9, 7, -1], fingers: [1, 2, 4, 3, 1, 0], baseFret: 0, name: 'Barré en 7' },
+                { frets: [12, 12, 12, 14, 15, 15], fingers: [1, 1, 1, 2, 3, 4], baseFret: 0, name: 'Barré en 12' }
+            ],
+            'E7': [
+                { frets: [0, 0, 1, 0, 2, 0], fingers: [0, 0, 1, 0, 2, 0], baseFret: 0, name: 'Position ouverte' },
+                { frets: [7, 7, 7, 9, 8, 10], fingers: [1, 1, 1, 4, 2, 3], baseFret: 0, name: 'Barré en 7' }
+            ],
+            'EMaj7': [
+                { frets: [0, 0, 1, 1, 2, 0], fingers: [0, 0, 2, 1, 3, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Em7': [
+                { frets: [0, 0, 0, 0, 2, 0], fingers: [0, 0, 0, 0, 2, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Edim': [
+                { frets: [0, 2, 0, 2, 1, 0], fingers: [0, 4, 0, 3, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Eaug': [
+                { frets: [0, 1, 1, 2, 3, 0], fingers: [0, 2, 1, 3, 4, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Esus4': [
+                { frets: [0, 0, 2, 2, 2, 0], fingers: [0, 0, 4, 3, 2, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Esus2': [
+                { frets: [2, 5, 4, 2, 2, 0], fingers: [1, 3, 2, 1, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            
+            'G': [
+                { frets: [3, 0, 0, 0, 2, 3], fingers: [3, 0, 0, 0, 1, 2], baseFret: 0, name: 'Position ouverte' },
+                { frets: [3, 2, 0, 0, 0, 3], fingers: [2, 1, 0, 0, 0, 3], baseFret: 0, name: 'Position ouverte alt.' },
+                { frets: [10, 10, 10, 12, 13, 13], fingers: [1, 1, 1, 2, 3, 4], baseFret: 0, name: 'Barré en 10' }
+            ],
+            'Gm': [
+                { frets: [3, 3, 3, 5, 5, 3], fingers: [1, 1, 1, 4, 3, 1], baseFret: 0, name: 'Barré en 3' },
+                { frets: [10, 11, 12, 12, 10, -1], fingers: [1, 2, 4, 3, 1, 0], baseFret: 0, name: 'Barré en 10' }
+            ],
+            'G7': [
+                { frets: [1, 0, 0, 0, 2, 3], fingers: [1, 0, 0, 0, 2, 3], baseFret: 0, name: 'Position ouverte' },
+                { frets: [3, 2, 3, 0, 0, 1], fingers: [3, 2, 4, 0, 0, 1], baseFret: 0, name: 'Position ouverte alt.' },
+                { frets: [10, 10, 10, 12, 11, 13], fingers: [1, 1, 1, 4, 2, 3], baseFret: 0, name: 'Barré en 10' }
+            ],
+            'GMaj7': [
+                { frets: [2, 0, 0, 0, 2, 3], fingers: [2, 0, 0, 0, 1, 3], baseFret: 0, name: 'Position 1' }
+            ],
+            'Gm7': [
+                { frets: [3, 3, 3, 3, 5, 3], fingers: [1, 1, 1, 1, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'Gdim': [
+                { frets: [3, 5, 3, 5, 4, 3], fingers: [1, 3, 1, 4, 2, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'Gaug': [
+                { frets: [3, 0, 0, 1, 2, 3], fingers: [4, 0, 0, 1, 2, 3], baseFret: 0, name: 'Position 1' }
+            ],
+            'Gsus4': [
+                { frets: [3, 1, 0, 0, 3, 3], fingers: [4, 1, 0, 0, 3, 2], baseFret: 0, name: 'Position 1' }
+            ],
+            'Gsus2': [
+                { frets: [3, 3, 0, 0, 0, 3], fingers: [4, 3, 0, 0, 0, 2], baseFret: 0, name: 'Position 1' }
+            ],
+            
+            'A': [
+                { frets: [0, 2, 2, 2, 0, -1], fingers: [0, 3, 2, 1, 0, 0], baseFret: 0, name: 'Position ouverte' },
+                { frets: [5, 5, 6, 7, 7, 5], fingers: [1, 1, 2, 3, 4, 1], baseFret: 0, name: 'Barré en 5' },
+                { frets: [9, 9, 11, 11, 11, 9], fingers: [1, 1, 2, 3, 4, 1], baseFret: 0, name: 'Barré en 9' }
+            ],
+            'Am': [
+                { frets: [0, 1, 2, 2, 0, -1], fingers: [0, 1, 3, 2, 0, 0], baseFret: 0, name: 'Position ouverte' },
+                { frets: [5, 5, 5, 7, 8, 8], fingers: [1, 1, 1, 2, 3, 4], baseFret: 0, name: 'Barré en 5' },
+                { frets: [12, 12, 13, 14, 14, 12], fingers: [1, 1, 2, 3, 4, 1], baseFret: 0, name: 'Barré en 12' }
+            ],
+            'A7': [
+                { frets: [0, 2, 0, 2, 0, -1], fingers: [0, 3, 0, 2, 0, 0], baseFret: 0, name: 'Position ouverte' },
+                { frets: [5, 5, 5, 7, 6, 8], fingers: [1, 1, 1, 4, 2, 3], baseFret: 0, name: 'Barré en 5' }
+            ],
+            'AMaj7': [
+                { frets: [0, 2, 1, 2, 0, -1], fingers: [0, 3, 1, 2, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Am7': [
+                { frets: [0, 1, 0, 2, 0, -1], fingers: [0, 1, 0, 2, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Adim': [
+                { frets: [2, 1, 2, 1, 0, -1], fingers: [4, 2, 3, 1, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Aaug': [
+                { frets: [1, 2, 2, 3, 0, -1], fingers: [1, 3, 2, 4, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Asus4': [
+                { frets: [0, 3, 2, 2, 0, -1], fingers: [0, 3, 2, 1, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Asus2': [
+                { frets: [0, 0, 2, 2, 0, -1], fingers: [0, 0, 2, 1, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            
+            // Barré chords for other notes
+            'F': [
+                { frets: [1, 1, 2, 3, 3, 1], fingers: [1, 1, 2, 4, 3, 1], baseFret: 0, name: 'Barré en 1' },
+                { frets: [5, 5, 5, 7, 8, 8], fingers: [1, 1, 1, 2, 3, 4], baseFret: 0, name: 'Barré en 5' },
+                { frets: [8, 8, 10, 10, 10, 8], fingers: [1, 1, 2, 3, 4, 1], baseFret: 0, name: 'Barré en 8' }
+            ],
+            'Fm': [
+                { frets: [1, 1, 1, 3, 3, 1], fingers: [1, 1, 1, 4, 3, 1], baseFret: 0, name: 'Barré en 1' },
+                { frets: [8, 9, 10, 10, 8, -1], fingers: [1, 2, 4, 3, 1, 0], baseFret: 0, name: 'Barré en 8' }
+            ],
+            'F7': [
+                { frets: [1, 1, 2, 1, 3, 1], fingers: [1, 1, 2, 1, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'FMaj7': [
+                { frets: [1, 1, 2, 2, 3, 1], fingers: [1, 1, 2, 2, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'Fm7': [
+                { frets: [1, 1, 1, 1, 3, 1], fingers: [1, 1, 1, 1, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'Fdim': [
+                { frets: [1, 3, 1, 3, 2, 1], fingers: [1, 3, 1, 4, 2, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'Faug': [
+                { frets: [1, 2, 2, 3, 0, 1], fingers: [1, 3, 2, 4, 0, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'Fsus4': [
+                { frets: [1, 1, 3, 3, 3, 1], fingers: [1, 1, 4, 4, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'Fsus2': [
+                { frets: [1, 1, 0, 3, 3, 1], fingers: [1, 1, 0, 4, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            
+            'B': [
+                { frets: [2, 4, 4, 4, 2, -1], fingers: [1, 3, 3, 3, 1, 0], baseFret: 0, name: 'Barré en 2' },
+                { frets: [7, 7, 8, 9, 9, 7], fingers: [1, 1, 2, 3, 4, 1], baseFret: 0, name: 'Barré en 7' },
+                { frets: [11, 11, 13, 13, 13, 11], fingers: [1, 1, 2, 3, 4, 1], baseFret: 0, name: 'Barré en 11' }
+            ],
+            'Bm': [
+                { frets: [2, 3, 4, 4, 2, -1], fingers: [1, 2, 4, 3, 1, 0], baseFret: 0, name: 'Barré en 2' },
+                { frets: [7, 7, 7, 9, 10, 10], fingers: [1, 1, 1, 2, 3, 4], baseFret: 0, name: 'Barré en 7' }
+            ],
+            'B7': [
+                { frets: [2, 0, 2, 1, 2, -1], fingers: [4, 0, 3, 1, 2, 0], baseFret: 0, name: 'Position ouverte' },
+                { frets: [7, 7, 7, 9, 8, 10], fingers: [1, 1, 1, 4, 2, 3], baseFret: 0, name: 'Barré en 7' }
+            ],
+            'BMaj7': [
+                { frets: [2, 4, 3, 4, 2, -1], fingers: [1, 4, 2, 3, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Bm7': [
+                { frets: [2, 3, 2, 4, 2, -1], fingers: [1, 2, 1, 3, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Bdim': [
+                { frets: [4, 3, 4, 3, 2, -1], fingers: [3, 2, 4, 2, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Baug': [
+                { frets: [3, 0, 0, 1, 2, -1], fingers: [4, 0, 0, 1, 2, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Bsus4': [
+                { frets: [2, 5, 4, 4, 2, -1], fingers: [1, 4, 3, 2, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'Bsus2': [
+                { frets: [2, 2, 4, 4, 2, -1], fingers: [1, 1, 4, 3, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            
+            // C# / Db chords (barré at fret 4 or 1)
+            'C#': [
+                { frets: [1, 1, 1, 3, 4, 4], fingers: [1, 1, 1, 2, 3, 4], baseFret: 0, name: 'Position 1' }
+            ],
+            'C#m': [
+                { frets: [1, 1, 2, 4, 4, 4], fingers: [1, 1, 2, 3, 3, 3], baseFret: 0, name: 'Position 1' }
+            ],
+            'C#7': [
+                { frets: [1, 1, 1, 3, 2, 4], fingers: [1, 1, 1, 4, 2, 3], baseFret: 0, name: 'Position 1' }
+            ],
+            'C#Maj7': [
+                { frets: [1, 1, 1, 3, 3, 3], fingers: [1, 1, 1, 2, 3, 4], baseFret: 0, name: 'Position 1' }
+            ],
+            'C#m7': [
+                { frets: [1, 1, 2, 4, 2, 4], fingers: [1, 1, 2, 4, 2, 3], baseFret: 0, name: 'Position 1' }
+            ],
+            'C#dim': [
+                { frets: [0, 1, 2, 0, 2, 0], fingers: [0, 1, 3, 0, 4, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'C#aug': [
+                { frets: [1, 2, 2, 3, 4, -1], fingers: [1, 2, 2, 3, 4, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'C#sus4': [
+                { frets: [1, 1, 1, 4, 4, 4], fingers: [1, 1, 1, 2, 3, 4], baseFret: 0, name: 'Position 1' }
+            ],
+            'C#sus2': [
+                { frets: [1, 1, 1, 1, 4, 4], fingers: [1, 1, 1, 1, 3, 4], baseFret: 0, name: 'Position 1' }
+            ],
+            
+            // D# / Eb chords (barré at fret 6 or shapes based on D)
+            'D#': [
+                { frets: [3, 6, 5, 3, -1, -1], fingers: [1, 4, 3, 2, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'D#m': [
+                { frets: [3, 6, 6, 3, -1, -1], fingers: [1, 3, 4, 2, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'D#7': [
+                { frets: [3, 4, 3, 3, -1, -1], fingers: [2, 4, 3, 1, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'D#Maj7': [
+                { frets: [3, 5, 4, 4, -1, -1], fingers: [1, 4, 2, 3, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'D#m7': [
+                { frets: [3, 4, 3, 4, -1, -1], fingers: [2, 3, 1, 4, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'D#dim': [
+                { frets: [3, 4, 2, 3, -1, -1], fingers: [2, 4, 1, 3, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'D#aug': [
+                { frets: [3, 2, 1, 0, 0, 3], fingers: [4, 3, 2, 0, 0, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'D#sus4': [
+                { frets: [3, 3, 4, 3, -1, -1], fingers: [1, 2, 4, 3, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'D#sus2': [
+                { frets: [3, 3, 3, 5, -1, -1], fingers: [1, 1, 1, 3, 0, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            
+            // F# / Gb chords (barré at fret 2)
+            'F#': [
+                { frets: [2, 2, 3, 4, 4, 2], fingers: [1, 1, 2, 4, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'F#m': [
+                { frets: [2, 2, 2, 4, 4, 2], fingers: [1, 1, 1, 3, 4, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'F#7': [
+                { frets: [2, 2, 3, 2, 4, 2], fingers: [1, 1, 3, 1, 4, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'F#Maj7': [
+                { frets: [2, 2, 3, 3, 4, 2], fingers: [1, 1, 2, 2, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'F#m7': [
+                { frets: [2, 2, 2, 2, 4, 2], fingers: [1, 1, 1, 1, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'F#dim': [
+                { frets: [2, 3, 4, 2, 4, 2], fingers: [1, 2, 4, 1, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'F#aug': [
+                { frets: [2, 1, 4, 3, 3, 2], fingers: [2, 1, 4, 3, 3, 2], baseFret: 0, name: 'Position 1' }
+            ],
+            'F#sus4': [
+                { frets: [2, 2, 4, 4, 4, 2], fingers: [1, 1, 3, 3, 4, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'F#sus2': [
+                { frets: [2, 2, 1, 4, 4, 2], fingers: [2, 2, 1, 3, 4, 2], baseFret: 0, name: 'Position 1' }
+            ],
+            
+            // G# / Ab chords (barré at fret 4)
+            'G#': [
+                { frets: [4, 1, 1, 1, 3, 4], fingers: [3, 1, 1, 1, 2, 4], baseFret: 0, name: 'Position 1' }
+            ],
+            'G#m': [
+                { frets: [4, 4, 4, 6, 6, 4], fingers: [1, 1, 1, 3, 4, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'G#7': [
+                { frets: [4, 1, 1, 1, 2, 4], fingers: [3, 1, 1, 1, 2, 4], baseFret: 0, name: 'Position 1' }
+            ],
+            'G#Maj7': [
+                { frets: [4, 1, 1, 1, 1, 4], fingers: [3, 1, 1, 1, 1, 4], baseFret: 0, name: 'Position 1' }
+            ],
+            'G#m7': [
+                { frets: [4, 4, 4, 4, 6, 4], fingers: [1, 1, 1, 1, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'G#dim': [
+                { frets: [4, 5, 6, 4, 6, 4], fingers: [1, 2, 4, 1, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'G#aug': [
+                { frets: [4, 3, 2, 1, 1, 0], fingers: [4, 3, 2, 1, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'G#sus4': [
+                { frets: [4, 4, 1, 1, 2, 4], fingers: [3, 4, 1, 1, 2, 3], baseFret: 0, name: 'Position 1' }
+            ],
+            'G#sus2': [
+                { frets: [4, 4, 1, 1, 4, 4], fingers: [2, 3, 1, 1, 4, 4], baseFret: 0, name: 'Position 1' }
+            ],
+            
+            // A# / Bb chords (barré at fret 1)
+            'A#': [
+                { frets: [1, 3, 3, 3, 1, -1], fingers: [1, 3, 3, 3, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'A#m': [
+                { frets: [1, 2, 3, 3, 1, -1], fingers: [1, 2, 4, 3, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'A#7': [
+                { frets: [1, 3, 1, 3, 1, -1], fingers: [1, 3, 1, 4, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'A#Maj7': [
+                { frets: [1, 3, 2, 3, 1, -1], fingers: [1, 4, 2, 3, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'A#m7': [
+                { frets: [1, 2, 1, 3, 1, -1], fingers: [1, 2, 1, 3, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'A#dim': [
+                { frets: [1, 2, 3, 2, 1, -1], fingers: [1, 2, 4, 3, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'A#aug': [
+                { frets: [1, 0, 3, 2, 2, 1], fingers: [1, 0, 4, 2, 3, 1], baseFret: 0, name: 'Position 1' }
+            ],
+            'A#sus4': [
+                { frets: [1, 3, 3, 3, 1, -1], fingers: [1, 3, 3, 3, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+            'A#sus2': [
+                { frets: [1, 1, 3, 3, 1, -1], fingers: [1, 1, 3, 4, 1, 0], baseFret: 0, name: 'Position 1' }
+            ],
+        };
+
+        // Mode selection
+        modeButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                modeButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentMode = btn.dataset.mode;
+                // Reset pools when changing mode
+                availableNotes = [];
+                availableChords = [];
+                
+                generateExercise();
+            });
+        });
+
+        // Generate exercise
+        function initializeNotesPool() {
+            // Use only the 12 unique notes
+            const notes = allNotes.map(note => ({ note }));
+            return notes;
+        }
+
+        function initializeChordsPool() {
+            // Get selected chord types
+            const selectedTypes = Array.from(document.querySelectorAll('.chord-type-checkbox:checked'))
+                .map(cb => cb.value);
+            
+            if (selectedTypes.length === 0) {
+                return []; // Return empty if no types selected
+            }
+            
+            // Generate chords only for selected types (12 notes × selected types)
+            const chords = [];
+            allNotes.forEach(root => {
+                selectedTypes.forEach(chordType => {
+                    chords.push({ root, type: chordType });
+                });
+            });
+            return chords;
+        }
+
+        function getRandomNote() {
+            // Initialize pool if empty or first time
+            if (availableNotes.length === 0) {
+                availableNotes = initializeNotesPool();
+                // Shuffle the array
+                for (let i = availableNotes.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [availableNotes[i], availableNotes[j]] = [availableNotes[j], availableNotes[i]];
+                }
+            }
+            
+            // Pick and remove the first note from available pool
+            const noteObj = availableNotes.shift();
+            return noteObj.note;
+        }
+
+        function getRandomChord() {
+            // Initialize pool if empty or first time
+            if (availableChords.length === 0) {
+                availableChords = initializeChordsPool();
+                // Shuffle the array
+                for (let i = availableChords.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [availableChords[i], availableChords[j]] = [availableChords[j], availableChords[i]];
+                }
+            }
+            
+            // Pick and remove the first chord from available pool
+            const chord = availableChords.shift();
+            return chord;
+        }
+
+        function generateExercise() {
+            const selectedStrings = ['E4', 'B3', 'G3', 'D3', 'A2', 'E2'];
+            const minFret = 0;
+            const maxFret = 12;
+
+            if (currentMode === 'single') {
+                generateSingleNote(selectedStrings, minFret, maxFret);
+            } else if (currentMode === 'chords') {
+                generateChord();
+            }
+
+            // Don't update display immediately if audio is active and a note is being played
+            if (isListening && lastDetectedNote !== null) {
+                // Wait for note to be released before showing new exercise
+                waitingForRelease = true;
+                // Hide the current note while waiting
+                currentNoteEl.textContent = '—';
+                intlNotationEl.textContent = '—';
+                frNotationEl.textContent = '—';
+            } else {
+                // No note being played, show immediately
+                updateDisplay();
+                waitingForRelease = false;
+            }
+            
+            // Reset detected note display when changing exercise
+            if (isListening) {
+                if (waitingForRelease) {
+                    // Show message to release the note
+                    detectedNoteEl.textContent = 'Relâchez la note pour passer à la suivante';
+                    detectedNoteEl.className = 'detected-note';
+                } else {
+                    detectedNoteEl.textContent = '—';
+                    detectedNoteEl.className = 'detected-note';
+                }
+                lastDetectedNote = null;
+                noteDetectionStartTime = 0;
+                hasAutoAdvanced = false;
+            }
+        }
+
+
+
+
+
+
+        function generateSingleNote(strings, minFret, maxFret) {
+            const note = getRandomNote();
+            
+            currentExercise = {
+                type: 'single',
+                notes: [{ note }]
+            };
+        }
+
+        function generateChord() {
+            const chord = getRandomChord();
+            const chordInfo = chordTypes[chord.type];
+            
+            // Get the notes in the chord
+            const rootIndex = allNotes.indexOf(chord.root);
+            const chordNotes = chordInfo.intervals.map(interval => {
+                const noteIndex = (rootIndex + interval) % 12;
+                return allNotes[noteIndex];
+            });
+            
+            currentExercise = {
+                type: 'chord',
+                chord: {
+                    root: chord.root,
+                    type: chord.type,
+                    suffix: chordInfo.suffix,
+                    french: chordInfo.french,
+                    notes: chordNotes
+                }
+            };
+        }
+
+        function updateDisplay() {
+            if (!currentExercise) return;
+
+            if (currentExercise.type === 'single') {
+                const note = currentExercise.notes[0].note;
+                currentNoteEl.textContent = note;
+                intlNotationEl.textContent = note;
+                frNotationEl.textContent = noteToFrench[note];
+                
+                // Play the note sound
+                playNote(note);
+            }
+        }
+
+        // Audio detection
+        async function startAudioDetection() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                microphone = audioContext.createMediaStreamSource(stream);
+                
+                analyser.fftSize = 4096;
+                microphone.connect(analyser);
+                
+                isListening = true;
+                statusIndicator.classList.add('active');
+                statusText.textContent = 'Microphone actif';
+                
+                detectPitch();
+                
+                // Request wake lock to prevent screen from sleeping
+                if ('wakeLock' in navigator) {
+                    try {
+                        wakeLock = await navigator.wakeLock.request('screen');
+                        console.log('Wake Lock activé - l\'écran ne se mettra pas en veille');
+                    } catch (err) {
+                        console.log('Wake Lock non disponible:', err);
+                    }
+                }
+            } catch (err) {
+                console.error('Erreur microphone:', err);
+                alert('Impossible d\'accéder au microphone');
+                enableAudioCheckbox.checked = false;
+            }
+        }
+
+        function stopAudioDetection() {
+            if (microphone) {
+                microphone.disconnect();
+                microphone = null;
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+            isListening = false;
+            statusIndicator.classList.remove('active');
+            statusText.textContent = 'Microphone désactivé';
+            detectedNoteEl.textContent = '—';
+            detectedNoteEl.className = 'detected-note';
+            lastDetectedNote = null;
+            noteDetectionStartTime = 0;
+            
+            // Release wake lock
+            if (wakeLock !== null) {
+                wakeLock.release()
+                    .then(() => {
+                        wakeLock = null;
+                        console.log('Wake Lock désactivé');
+                    });
+            }
+        }
+
+        function detectPitch() {
+            if (!isListening) return;
+            
+            const bufferLength = analyser.fftSize;
+            const buffer = new Float32Array(bufferLength);
+            analyser.getFloatTimeDomainData(buffer);
+            
+            const frequency = autoCorrelate(buffer, audioContext.sampleRate);
+            
+            // If waiting for release, don't update detection display
+            if (waitingForRelease) {
+                if (frequency <= 0) {
+                    // Note released, show new exercise
+                    waitingForRelease = false;
+                    updateDisplay();
+                    detectedNoteEl.textContent = '—';
+                    detectedNoteEl.className = 'detected-note';
+                    lastDetectedNote = null;
+                    noteDetectionStartTime = 0;
+                }
+                requestAnimationFrame(detectPitch);
+                return;
+            }
+            
+            if (frequency > 0) {
+                const note = frequencyToNote(frequency);
+                const currentTime = Date.now();
+                
+                // Check if the note has changed
+                if (note !== lastDetectedNote) {
+                    // New note detected, reset timer and clear display
+                    lastDetectedNote = note;
+                    noteDetectionStartTime = currentTime;
+                    detectedNoteEl.textContent = '—';
+                    detectedNoteEl.className = 'detected-note';
+                } else {
+                    // Same note, check if it's been stable for 500ms
+                    const elapsedTime = currentTime - noteDetectionStartTime;
+                    
+                    if (elapsedTime >= stableNoteDuration) {
+                        // Note has been stable for 200ms, display it
+                        detectedNoteEl.textContent = `${note} (${noteToFrench[note]})`;
+                        
+                        // Check if correct
+                        if (currentExercise && currentExercise.type === 'single') {
+                            if (note === currentExercise.notes[0].note) {
+                                detectedNoteEl.className = 'detected-note correct';
+                                
+                                // Auto-advance to next note after a short delay (only once)
+                                if (!hasAutoAdvanced) {
+                                    hasAutoAdvanced = true;
+                                    const delayMs = parseFloat(advanceDelayInput.value) * 1000;
+                                    setTimeout(() => {
+                                        if (isListening) { // Only if still listening
+                                            generateExercise();
+                                            hasAutoAdvanced = false; // Reset for next note
+                                        }
+                                    }, delayMs);
+                                }
+                            } else {
+                                detectedNoteEl.className = 'detected-note incorrect';
+                            }
+                        } else {
+                            detectedNoteEl.className = 'detected-note';
+                        }
+                    }
+                }
+            } else {
+                // No clear pitch detected, reset and clear display
+                if (lastDetectedNote !== null) {
+                    lastDetectedNote = null;
+                    noteDetectionStartTime = 0;
+                    detectedNoteEl.textContent = '—';
+                    detectedNoteEl.className = 'detected-note';
+                }
+            }
+            
+            requestAnimationFrame(detectPitch);
+        }
+
+        function autoCorrelate(buffer, sampleRate) {
+            let size = buffer.length;
+            let maxSamples = Math.floor(size / 2);
+            let bestOffset = -1;
+            let bestCorrelation = 0;
+            let rms = 0;
+            
+            for (let i = 0; i < size; i++) {
+                let val = buffer[i];
+                rms += val * val;
+            }
+            rms = Math.sqrt(rms / size);
+            
+            if (rms < 0.01) return -1;
+            
+            let lastCorrelation = 1;
+            for (let offset = 1; offset < maxSamples; offset++) {
+                let correlation = 0;
+                for (let i = 0; i < maxSamples; i++) {
+                    correlation += Math.abs(buffer[i] - buffer[i + offset]);
+                }
+                correlation = 1 - (correlation / maxSamples);
+                
+                if (correlation > 0.9 && correlation > lastCorrelation) {
+                    let foundGoodCorrelation = false;
+                    if (correlation > bestCorrelation) {
+                        bestCorrelation = correlation;
+                        bestOffset = offset;
+                        foundGoodCorrelation = true;
+                    }
+                }
+                lastCorrelation = correlation;
+            }
+            
+            if (bestCorrelation > 0.01) {
+                return sampleRate / bestOffset;
+            }
+            return -1;
+        }
+
+        function frequencyToNote(frequency) {
+            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const A4 = 440;
+            const C0 = A4 * Math.pow(2, -4.75);
+            
+            if (frequency < 20) return null;
+            
+            const halfSteps = 12 * Math.log2(frequency / C0);
+            const noteIndex = Math.round(halfSteps) % 12;
+            
+            return noteNames[noteIndex];
+        }
+
+        function noteToFrequency(noteName) {
+            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const A4 = 440;
+            const C4 = 261.63; // Middle C
+            
+            const noteIndex = noteNames.indexOf(noteName);
+            if (noteIndex === -1) return null;
+            
+            // Return frequency for the note in octave 4 (middle octave)
+            const halfStepsFromC4 = noteIndex;
+            return C4 * Math.pow(2, halfStepsFromC4 / 12);
+        }
+
+        function playNote(noteName, duration = 2000) {
+            if (!playSoundCheckbox.checked) return;
+            
+            const frequency = noteToFrequency(noteName);
+            if (!frequency) return;
+            
+            // Create audio context if not exists
+            if (!audioContextSynth) {
+                audioContextSynth = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            const now = audioContextSynth.currentTime;
+            const ctx = audioContextSynth;
+            
+            // Master gain for the complete sound
+            const masterGain = ctx.createGain();
+            
+            // Body resonance filter (simulates guitar body)
+            const bodyFilter = ctx.createBiquadFilter();
+            bodyFilter.type = 'bandpass';
+            bodyFilter.frequency.setValueAtTime(200, now); // Wood body resonance around 200Hz
+            bodyFilter.Q.setValueAtTime(1, now);
+            
+            // Brightness filter (simulates tone control)
+            const brightnessFilter = ctx.createBiquadFilter();
+            brightnessFilter.type = 'lowpass';
+            brightnessFilter.frequency.setValueAtTime(3500, now); // Cut high frequencies
+            brightnessFilter.Q.setValueAtTime(0.7, now);
+            
+            // Subtle vibrato (LFO)
+            const vibrato = ctx.createOscillator();
+            const vibratoGain = ctx.createGain();
+            vibrato.frequency.setValueAtTime(5, now); // 5Hz vibrato
+            vibratoGain.gain.setValueAtTime(0, now);
+            vibratoGain.gain.linearRampToValueAtTime(2, now + 0.5); // Vibrato fades in
+            vibrato.connect(vibratoGain);
+            
+            // Guitar sound uses multiple harmonics with different amplitudes
+            // Harmonics decay at different rates (inharmonicity)
+            const harmonics = [
+                { mult: 1.0, gain: 1.0, decay: 1.0 },      // Fundamental
+                { mult: 2.0, gain: 0.6, decay: 0.9 },      // 2nd harmonic (octave)
+                { mult: 3.0, gain: 0.4, decay: 0.8 },      // 3rd harmonic
+                { mult: 4.0, gain: 0.25, decay: 0.7 },     // 4th harmonic
+                { mult: 5.0, gain: 0.15, decay: 0.6 },     // 5th harmonic
+                { mult: 6.0, gain: 0.1, decay: 0.5 },      // 6th harmonic
+                { mult: 7.0, gain: 0.05, decay: 0.4 },     // 7th harmonic
+                { mult: 8.0, gain: 0.03, decay: 0.3 }      // 8th harmonic
+            ];
+            
+            harmonics.forEach((harmonic, index) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                // Use sine waves for each harmonic
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(frequency * harmonic.mult, now);
+                
+                // Connect vibrato to this oscillator
+                vibratoGain.connect(osc.frequency);
+                
+                // Slightly detune higher harmonics (inharmonicity)
+                if (index > 2) {
+                    osc.detune.setValueAtTime(Math.random() * 4 - 2, now);
+                }
+                
+                // Guitar-like ADSR envelope with individual decay rates
+                const maxGain = 0.12 * harmonic.gain;
+                gain.gain.setValueAtTime(0, now);
+                
+                // Attack - very fast pluck (slightly randomized per harmonic)
+                const attackTime = 0.003 + (index * 0.001);
+                gain.gain.linearRampToValueAtTime(maxGain, now + attackTime);
+                
+                // Decay - quick initial drop
+                gain.gain.exponentialRampToValueAtTime(maxGain * 0.7, now + 0.04);
+                
+                // Sustain - gradual fade (higher harmonics fade faster)
+                const sustainFactor = harmonic.decay;
+                gain.gain.exponentialRampToValueAtTime(maxGain * 0.4 * sustainFactor, now + 0.3);
+                gain.gain.exponentialRampToValueAtTime(maxGain * 0.2 * sustainFactor, now + 0.8);
+                gain.gain.exponentialRampToValueAtTime(maxGain * 0.08 * sustainFactor, now + 1.5);
+                
+                // Release - final fade out
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration/1000);
+                
+                osc.connect(gain);
+                gain.connect(bodyFilter);
+                
+                osc.start(now);
+                osc.stop(now + duration/1000 + 0.1);
+            });
+            
+            vibrato.start(now);
+            vibrato.stop(now + duration/1000 + 0.1);
+            
+            // Add pluck attack noise (simulates pick hitting string)
+            const bufferSize = ctx.sampleRate * 0.015; // 15ms of noise
+            const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const noiseData = noiseBuffer.getChannelData(0);
+            
+            // Filtered noise for realistic pluck
+            for (let i = 0; i < bufferSize; i++) {
+                const decay = 1 - (i / bufferSize);
+                noiseData[i] = (Math.random() * 2 - 1) * 0.15 * decay;
+            }
+            
+            const noiseSource = ctx.createBufferSource();
+            noiseSource.buffer = noiseBuffer;
+            
+            const noiseGain = ctx.createGain();
+            noiseGain.gain.setValueAtTime(0.4, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+            
+            const noiseFilter = ctx.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.setValueAtTime(frequency * 1.5, now);
+            noiseFilter.Q.setValueAtTime(2, now);
+            
+            noiseSource.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(bodyFilter);
+            
+            noiseSource.start(now);
+            noiseSource.stop(now + 0.015);
+            
+            // Add subtle string resonance (Karplus-Strong inspired)
+            const stringResonance = ctx.createDelay();
+            const stringFeedback = ctx.createGain();
+            const stringFilter = ctx.createBiquadFilter();
+            
+            stringResonance.delayTime.setValueAtTime(1 / frequency, now);
+            stringFeedback.gain.setValueAtTime(0.3, now);
+            stringFilter.type = 'lowpass';
+            stringFilter.frequency.setValueAtTime(frequency * 4, now);
+            
+            bodyFilter.connect(stringResonance);
+            stringResonance.connect(stringFilter);
+            stringFilter.connect(stringFeedback);
+            stringFeedback.connect(stringResonance);
+            
+            // Final chain
+            bodyFilter.connect(brightnessFilter);
+            brightnessFilter.connect(masterGain);
+            masterGain.connect(ctx.destination);
+            
+            // Master volume envelope
+            masterGain.gain.setValueAtTime(0.8, now);
+            masterGain.gain.setValueAtTime(0.8, now + duration/1000 - 0.1);
+            masterGain.gain.linearRampToValueAtTime(0, now + duration/1000);
+        }
+
+        function frequencyToNote(frequency) {
+            const noteNum = 12 * (Math.log(frequency / 440) / Math.log(2));
+            const noteIndex = Math.round(noteNum) + 69;
+            const octave = Math.floor(noteIndex / 12) - 1;
+            const note = allNotes[noteIndex % 12];
+            return note;
+        }
+
+        // Event listeners
+        nextBtn.addEventListener('click', generateExercise);
+        resetBtn.addEventListener('click', () => {
+            stopAutoAdvanceTimer();
+            availableNotes = [];
+            availableChords = [];
+            currentExercise = null;
+            currentNoteEl.textContent = '—';
+            intlNotationEl.textContent = '—';
+            frNotationEl.textContent = '—';
+        });
+
+        enableAudioCheckbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                audioDetector.style.display = 'block';
+                startAudioDetection();
+            } else {
+                audioDetector.style.display = 'none';
+                stopAudioDetection();
+            }
+        });
+
+        playSoundCheckbox.addEventListener('change', () => {
+            // Just update the state, will be used when playing notes
+            playNoteSound = playSoundCheckbox.checked;
+        });
+
+
+
+
+        // Reset chord pool when chord type selection changes
+
+        // Initialize
+        generateExercise();
+        
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker enregistré:', registration);
+                    })
+                    .catch(error => {
+                        console.log('Erreur Service Worker:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
