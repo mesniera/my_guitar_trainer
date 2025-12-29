@@ -1,0 +1,17 @@
+{
+  "appId": "com.yourname.guitartrainer",
+  "appName": "Guitar Trainer Pro",
+  "webDir": ".",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0a0e14",
+      "showSpinner": false
+    }
+  },
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#0a0e14"
+  }
+}

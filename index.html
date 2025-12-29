@@ -80,6 +80,17 @@
             grid-template-columns: 350px 1fr;
             gap: 1.5rem;
             margin-bottom: 1rem;
+            transition: grid-template-columns 0.3s ease;
+        }
+        
+        .main-grid.settings-hidden {
+            grid-template-columns: 1fr;
+            justify-items: center;
+        }
+        
+        .main-grid.settings-hidden .display-panel {
+            max-width: 1200px;
+            width: 100%;
         }
 
         .settings-panel {
@@ -90,6 +101,11 @@
             height: fit-content;
             position: sticky;
             top: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .settings-panel.hidden {
+            display: none;
         }
 
         .section-title {
@@ -109,7 +125,14 @@
             margin-bottom: 1.25rem;
         }
 
-        .mode-btn {
+        .difficulty-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .mode-btn, .difficulty-btn {
             background: var(--bg-tertiary);
             border: 2px solid var(--border);
             color: var(--text-primary);
@@ -128,7 +151,7 @@
             transform: translateX(4px);
         }
 
-        .mode-btn.active {
+        .mode-btn.active, .difficulty-btn.active {
             background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
             border-color: transparent;
             color: var(--bg-primary);
@@ -214,6 +237,8 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
+            position: relative;
+            transition: all 0.3s ease;
         }
 
         .exercise-display {
@@ -662,45 +687,143 @@
 </head>
 <body>
     <div class="container">
+        <!-- Toggle settings button -->
+        <button id="toggleSettingsBtn" style="position: fixed; top: 1rem; left: 1rem; z-index: 1000; padding: 0.75rem 1rem; background: var(--bg-secondary); border: 2px solid var(--accent-primary); border-radius: 10px; color: var(--accent-primary); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);"
+        onmouseover="this.style.background='var(--accent-primary)'; this.style.color='var(--bg-primary)'"
+        onmouseout="this.style.background='var(--bg-secondary)'; this.style.color='var(--accent-primary)'">
+            ☰ Afficher Options
+        </button>
+        
         <header>
             <h1>GUITAR TRAINER PRO</h1>
             <p class="subtitle">Entraînement avancé avec détection audio</p>
         </header>
 
-        <div class="main-grid">
+        <div class="main-grid settings-hidden" id="mainGrid">
             <!-- Settings Panel -->
-            <div class="settings-panel">
+            <div class="settings-panel hidden" id="settingsPanel">
+                <!-- 1. Mode d'exercice -->
                 <div class="section-title">Mode d'exercice</div>
                 <div class="mode-selector">
                     <button class="mode-btn active" data-mode="single">
                         📍 Notes individuelles
                     </button>
+                    <button class="mode-btn" data-mode="speed">
+                        ⚡ Mode rapidité
+                    </button>
                 </div>
 
+                <!-- 2. Niveau de difficulté -->
+                <div class="section-title">Niveau de difficulté</div>
+                <div class="difficulty-selector">
+                    <button class="difficulty-btn" data-difficulty="beginner">
+                        🌱 Débutant (5 notes)
+                    </button>
+                    <button class="difficulty-btn active" data-difficulty="intermediate">
+                        📚 Intermédiaire (7 notes)
+                    </button>
+                    <button class="difficulty-btn" data-difficulty="advanced">
+                        🎸 Avancé (12 notes)
+                    </button>
+                    <!-- Expert mode temporarily disabled -->
+                    <!--
+                    <button class="difficulty-btn" data-difficulty="expert">
+                        🏆 Expert (multi-cordes)
+                    </button>
+                    -->
+                </div>
+
+                <!-- 3. Mode rapidité (conditionnel) -->
+                <div id="speedModeSettings" style="display: none;">
+                    <div class="section-title">Mode rapidité</div>
+                    <div class="setting-group">
+                        <label class="setting-label">Durée du défi (secondes)</label>
+                        <input type="number" id="speedModeDuration" min="30" max="300" step="30" value="60">
+                    </div>
+                </div>
+
+                <!-- 4. Visualisation manche -->
+                <div class="section-title">Visualisation manche</div>
+                <div class="setting-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="showFretboardCheckbox">
+                        <span>Afficher la position sur le manche</span>
+                    </label>
+                </div>
+                <div class="setting-group" id="instrumentSelection" style="display: none;">
+                    <label class="setting-label">Type d'instrument</label>
+                    <select id="instrumentType" style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 2px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'DM Sans', sans-serif; font-size: 0.9rem;">
+                        <option value="guitar-6">Guitare 6 cordes</option>
+                        <option value="guitar-7">Guitare 7 cordes</option>
+                        <option value="bass-4">Basse 4 cordes</option>
+                        <option value="bass-5">Basse 5 cordes</option>
+                    </select>
+                </div>
+                <div class="setting-group" id="fretCountSelection" style="display: none;">
+                    <label class="setting-label">Nombre de frettes</label>
+                    <select id="fretCount" style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 2px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'DM Sans', sans-serif; font-size: 0.9rem;">
+                        <option value="12" selected>12 frettes</option>
+                        <option value="15">15 frettes</option>
+                        <option value="24">24 frettes</option>
+                    </select>
+                </div>
+
+                <!-- 5. Détection audio -->
                 <div class="section-title">Détection audio</div>
                 <div class="setting-group">
                     <label class="checkbox-label">
-                        <input type="checkbox" id="enableAudio">
+                        <input type="checkbox" id="enableAudio" checked>
                         <span>Activer le microphone</span>
                     </label>
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">Délai avant passage (secondes)</label>
-                    <input type="number" id="advanceDelay" min="0.5" max="5" step="0.5" value="1.5">
+                    <input type="number" id="advanceDelay" min="0.5" max="5" step="0.5" value="1">
                 </div>
                 
+                <!-- 6. Lecture audio -->
                 <div class="section-title">Lecture audio</div>
                 <div class="setting-group">
                     <label class="checkbox-label">
-                        <input type="checkbox" id="playSoundCheckbox" checked>
+                        <input type="checkbox" id="playSoundCheckbox">
                         <span>Jouer le son de la note</span>
                     </label>
+                </div>
+                
+                <!-- Version display -->
+                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); text-align: center;">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;">
+                        Guitar Trainer Pro <span id="appVersion">v1.0.0</span>
+                    </div>
                 </div>
             </div>
 
             <!-- Display Panel -->
             <div class="display-panel">
+                <!-- Settings open overlay message -->
+                <div id="settingsOverlay" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; text-align: center; background: var(--bg-secondary); padding: 2rem; border-radius: 16px; border: 2px solid var(--accent-primary); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);">
+                    <div style="font-size: 1.2rem; color: var(--accent-primary); margin-bottom: 0.5rem;">⚙️ Configuration en cours</div>
+                    <div style="font-size: 0.9rem; color: var(--text-secondary);">Fermez les options pour commencer l'entraînement</div>
+                </div>
+                
                 <div class="exercise-display">
+                    <!-- Speed mode stats (hidden by default) -->
+                    <div id="speedModeStats" style="display: none; margin-bottom: 1rem; text-align: center;">
+                        <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 0.75rem;">
+                            <div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.25rem;">Temps restant</div>
+                                <div id="speedModeTimer" style="font-family: 'JetBrains Mono', monospace; font-size: 1.8rem; font-weight: 700; color: var(--accent-primary);">60</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.25rem;">Score</div>
+                                <div id="speedModeScore" style="font-family: 'JetBrains Mono', monospace; font-size: 1.8rem; font-weight: 700; color: var(--success);">0</div>
+                            </div>
+                        </div>
+                        <button id="speedModeStartBtn" class="btn btn-primary" style="margin: 0 auto 0.75rem auto; justify-content: center;">
+                            ▶ Démarrer le défi
+                        </button>
+                    </div>
+                    
                     <div class="current-note" id="currentNote">—</div>
                     
                     <div class="note-notation">
@@ -712,6 +835,12 @@
                             <div class="notation-label">Française</div>
                             <div class="notation-value" id="frNotation">—</div>
                         </div>
+                    </div>
+
+                    <!-- Fretboard visualization -->
+                    <div id="fretboardDisplay" style="display: none; margin-top: 1.5rem; width: 100%;">
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem; text-align: center;">Position sur le manche</div>
+                        <div id="fretboardCanvas" style="background: var(--bg-tertiary); padding: 1rem; border-radius: 12px; border: 2px solid var(--border); overflow-x: auto; max-width: 100%;"></div>
                     </div>
 
                     <div class="chord-notes-display" id="chordNotesDisplay" style="display: none;">
@@ -734,12 +863,9 @@
                         </div>
                     </div>
 
-                    <div class="control-buttons">
+                    <div class="control-buttons" id="controlButtons">
                         <button class="btn btn-primary" id="nextBtn">
                             ▶ Suivant
-                        </button>
-                        <button class="btn btn-secondary" id="resetBtn">
-                            ⟳ Réinitialiser
                         </button>
                     </div>
 
@@ -756,6 +882,36 @@
     </div>
 
     <script>
+        // Application version
+        const APP_VERSION = 'v1.1.0';
+        
+        // CRITICAL: Check domain FIRST and unregister any existing service worker on invalid domains
+        const hostname = window.location.hostname;
+        const isValidDomain = !hostname.includes('claudeusercontent') && 
+                              !hostname.includes('localhost') && 
+                              hostname !== '127.0.0.1';
+        
+        // Unregister any existing service workers on invalid domains
+        if (!isValidDomain && 'serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                registrations.forEach(registration => {
+                    registration.unregister();
+                    console.log('Service worker désinstallé (domaine invalide)');
+                });
+            }).catch(err => {
+                console.log('Cleanup service worker ignoré');
+            });
+            
+            // Also clear caches
+            if ('caches' in window) {
+                caches.keys().then(names => {
+                    names.forEach(name => {
+                        caches.delete(name);
+                    });
+                });
+            }
+        }
+        
         // Note mappings
         const noteToFrench = {
             'C': 'Do', 'C#': 'Do#', 'Db': 'Réb', 'D': 'Ré', 'D#': 'Ré#', 
@@ -781,7 +937,41 @@
 
         // State
         let currentMode = 'single';
+        let currentDifficulty = 'intermediate';
         let currentExercise = null;
+        
+        // Note definitions for each difficulty level
+        const difficultyLevels = {
+            beginner: {
+                name: 'Débutant',
+                notes: ['E', 'B', 'G', 'D', 'A'], // Open strings - unique notes only
+                description: 'Cordes à vide'
+            },
+            intermediate: {
+                name: 'Intermédiaire', 
+                notes: ['C', 'D', 'E', 'F', 'G', 'A', 'B'], // Natural notes
+                description: 'Notes naturelles'
+            },
+            advanced: {
+                name: 'Avancé',
+                notes: ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'], // All chromatic
+                description: 'Toutes les notes'
+            },
+            expert: {
+                name: 'Expert',
+                // Multi-string: same note on different strings
+                notes: [
+                    {note: 'E', strings: ['E2', 'E4']},
+                    {note: 'F', strings: ['E2-1', 'E4-1']},
+                    {note: 'G', strings: ['E2-3', 'D3', 'G3', 'E4-3']},
+                    {note: 'A', strings: ['E2-5', 'A2', 'D3-7', 'G3-2', 'E4-5']},
+                    {note: 'B', strings: ['A2-2', 'G3-4', 'B3', 'E4-7']},
+                    {note: 'C', strings: ['A2-3', 'B3-1']},
+                    {note: 'D', strings: ['A2-5', 'D3', 'B3-3', 'G3-7']},
+                ],
+                description: 'Multi-cordes'
+            }
+        };
         let audioContext = null;
         let analyser = null;
         let microphone = null;
@@ -800,11 +990,48 @@
         let wakeLock = null;
         let audioContextSynth = null;
         let playNoteSound = true; // Toggle to enable/disable sound playback
+        
+        // Speed mode variables
+        let speedModeActive = false;
+        let speedModeTimerInterval = null;
+        let speedModeTimeRemaining = 0;
+        let speedModeCorrectCount = 0;
+        let speedModeStartTime = 0;
+        
+        // Fretboard state - track which strings are enabled
+        let enabledStrings = {};
+        
+        // Instrument tunings (from low to high string)
+        const instrumentTunings = {
+            'guitar-6': {
+                name: 'Guitare 6 cordes',
+                strings: ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'],
+                notes: ['E', 'A', 'D', 'G', 'B', 'E'],
+                notesFr: ['Mi', 'La', 'Ré', 'Sol', 'Si', 'Mi']
+            },
+            'guitar-7': {
+                name: 'Guitare 7 cordes',
+                strings: ['B1', 'E2', 'A2', 'D3', 'G3', 'B3', 'E4'],
+                notes: ['B', 'E', 'A', 'D', 'G', 'B', 'E'],
+                notesFr: ['Si', 'Mi', 'La', 'Ré', 'Sol', 'Si', 'Mi']
+            },
+            'bass-4': {
+                name: 'Basse 4 cordes',
+                strings: ['E1', 'A1', 'D2', 'G2'],
+                notes: ['E', 'A', 'D', 'G'],
+                notesFr: ['Mi', 'La', 'Ré', 'Sol']
+            },
+            'bass-5': {
+                name: 'Basse 5 cordes',
+                strings: ['B0', 'E1', 'A1', 'D2', 'G2'],
+                notes: ['B', 'E', 'A', 'D', 'G'],
+                notesFr: ['Si', 'Mi', 'La', 'Ré', 'Sol']
+            }
+        };
 
         // Elements
         const modeButtons = document.querySelectorAll('.mode-btn');
         const nextBtn = document.getElementById('nextBtn');
-        const resetBtn = document.getElementById('resetBtn');
         const currentNoteEl = document.getElementById('currentNote');
         const intlNotationEl = document.getElementById('intlNotation');
         const frNotationEl = document.getElementById('frNotation');
@@ -815,6 +1042,25 @@
         const statusText = document.getElementById('statusText');
         const advanceDelayInput = document.getElementById('advanceDelay');
         const playSoundCheckbox = document.getElementById('playSoundCheckbox');
+        const speedModeDurationInput = document.getElementById('speedModeDuration');
+        const speedModeStats = document.getElementById('speedModeStats');
+        const speedModeTimer = document.getElementById('speedModeTimer');
+        const speedModeScore = document.getElementById('speedModeScore');
+        const speedModeStartBtn = document.getElementById('speedModeStartBtn');
+        const showFretboardCheckbox = document.getElementById('showFretboardCheckbox');
+        const instrumentSelection = document.getElementById('instrumentSelection');
+        const fretCountSelection = document.getElementById('fretCountSelection');
+        const instrumentType = document.getElementById('instrumentType');
+        const fretCount = document.getElementById('fretCount');
+        const fretboardDisplay = document.getElementById('fretboardDisplay');
+        const fretboardCanvas = document.getElementById('fretboardCanvas');
+        const toggleSettingsBtn = document.getElementById('toggleSettingsBtn');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const mainGrid = document.getElementById('mainGrid');
+        const settingsOverlay = document.getElementById('settingsOverlay');
+        const displayPanel = document.querySelector('.display-panel');
+        const speedModeSettings = document.getElementById('speedModeSettings');
+        const controlButtons = document.getElementById('controlButtons');
 
         // Chord shapes database - format: [fret positions for strings 1-6 (e to E), finger numbers]
         // -1 = muted, 0 = open string
@@ -1204,15 +1450,58 @@
                 availableNotes = [];
                 availableChords = [];
                 
+                // Show/hide speed mode UI
+                if (currentMode === 'speed') {
+                    speedModeStats.style.display = 'block';
+                    speedModeSettings.style.display = 'block';
+                    controlButtons.style.display = 'none'; // Hide Suivant button
+                    stopSpeedMode(); // Reset if was running
+                } else {
+                    speedModeStats.style.display = 'none';
+                    speedModeSettings.style.display = 'none';
+                    controlButtons.style.display = 'flex'; // Show Suivant button
+                    stopSpeedMode();
+                }
+                
+                generateExercise();
+            });
+        });
+
+        // Difficulty selection
+        const difficultyButtons = document.querySelectorAll('.difficulty-btn');
+        difficultyButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                difficultyButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentDifficulty = btn.dataset.difficulty;
+                // Reset pools when changing difficulty
+                availableNotes = [];
+                
                 generateExercise();
             });
         });
 
         // Generate exercise
         function initializeNotesPool() {
-            // Use only the 12 unique notes
-            const notes = allNotes.map(note => ({ note }));
-            return notes;
+            // Use notes based on current difficulty level
+            const level = difficultyLevels[currentDifficulty];
+            
+            if (currentDifficulty === 'expert') {
+                // Expert mode: return all note-string combinations
+                const combinations = [];
+                level.notes.forEach(noteObj => {
+                    noteObj.strings.forEach(stringInfo => {
+                        combinations.push({ 
+                            note: noteObj.note, 
+                            string: stringInfo 
+                        });
+                    });
+                });
+                return combinations;
+            } else {
+                // Other modes: simple note list
+                return level.notes.map(note => ({ note }));
+            }
         }
 
         function initializeChordsPool() {
@@ -1247,7 +1536,13 @@
             
             // Pick and remove the first note from available pool
             const noteObj = availableNotes.shift();
-            return noteObj.note;
+            
+            // Return object with note and string info (for expert mode)
+            if (currentDifficulty === 'expert' && noteObj.string) {
+                return { note: noteObj.note, string: noteObj.string };
+            } else {
+                return { note: noteObj.note };
+            }
         }
 
         function getRandomChord() {
@@ -1313,11 +1608,12 @@
 
 
         function generateSingleNote(strings, minFret, maxFret) {
-            const note = getRandomNote();
+            const noteObj = getRandomNote();
             
             currentExercise = {
                 type: 'single',
-                notes: [{ note }]
+                notes: [noteObj],
+                difficulty: currentDifficulty
             };
         }
 
@@ -1348,10 +1644,28 @@
             if (!currentExercise) return;
 
             if (currentExercise.type === 'single') {
-                const note = currentExercise.notes[0].note;
+                const noteObj = currentExercise.notes[0];
+                const note = noteObj.note;
+                
+                // Display note name
                 currentNoteEl.textContent = note;
                 intlNotationEl.textContent = note;
                 frNotationEl.textContent = noteToFrench[note];
+                
+                // For expert mode, show string info
+                if (currentExercise.difficulty === 'expert' && noteObj.string) {
+                    const stringDisplay = noteObj.string.replace(/([A-G]\d+)-?(\d*)/, (match, string, fret) => {
+                        if (fret) {
+                            return `Corde ${string} - Frette ${fret}`;
+                        } else {
+                            return `Corde ${string} à vide`;
+                        }
+                    });
+                    frNotationEl.textContent = noteToFrench[note] + ` (${stringDisplay})`;
+                }
+                
+                // Draw fretboard if enabled
+                drawFretboard(note);
                 
                 // Play the note sound
                 playNote(note);
@@ -1466,10 +1780,13 @@
                             if (note === currentExercise.notes[0].note) {
                                 detectedNoteEl.className = 'detected-note correct';
                                 
+                                // Increment speed mode score
+                                incrementSpeedModeScore();
+                                
                                 // Auto-advance to next note after a short delay (only once)
                                 if (!hasAutoAdvanced) {
                                     hasAutoAdvanced = true;
-                                    const delayMs = parseFloat(advanceDelayInput.value) * 1000;
+                                    const delayMs = speedModeActive ? 500 : parseFloat(advanceDelayInput.value) * 1000;
                                     setTimeout(() => {
                                         if (isListening) { // Only if still listening
                                             generateExercise();
@@ -1726,15 +2043,6 @@
 
         // Event listeners
         nextBtn.addEventListener('click', generateExercise);
-        resetBtn.addEventListener('click', () => {
-            stopAutoAdvanceTimer();
-            availableNotes = [];
-            availableChords = [];
-            currentExercise = null;
-            currentNoteEl.textContent = '—';
-            intlNotationEl.textContent = '—';
-            frNotationEl.textContent = '—';
-        });
 
         enableAudioCheckbox.addEventListener('change', (e) => {
             if (e.target.checked) {
@@ -1751,16 +2059,312 @@
             playNoteSound = playSoundCheckbox.checked;
         });
 
+        showFretboardCheckbox.addEventListener('change', () => {
+            if (showFretboardCheckbox.checked) {
+                instrumentSelection.style.display = 'block';
+                fretCountSelection.style.display = 'block';
+                // Redraw fretboard with current note
+                if (currentExercise && currentExercise.type === 'single') {
+                    drawFretboard(currentExercise.notes[0].note);
+                }
+            } else {
+                instrumentSelection.style.display = 'none';
+                fretCountSelection.style.display = 'none';
+                fretboardDisplay.style.display = 'none';
+            }
+        });
+
+        instrumentType.addEventListener('change', () => {
+            // Initialize enabled strings for new instrument
+            initializeEnabledStrings();
+            
+            // Redraw fretboard with new instrument
+            if (showFretboardCheckbox.checked && currentExercise && currentExercise.type === 'single') {
+                drawFretboard(currentExercise.notes[0].note);
+            }
+        });
+
+        fretCount.addEventListener('change', () => {
+            // Redraw fretboard with new fret count
+            if (showFretboardCheckbox.checked && currentExercise && currentExercise.type === 'single') {
+                drawFretboard(currentExercise.notes[0].note);
+            }
+        });
+
+        // Toggle settings panel
+        let settingsVisible = false; // Start with settings hidden
+        toggleSettingsBtn.addEventListener('click', () => {
+            settingsVisible = !settingsVisible;
+            if (settingsVisible) {
+                settingsPanel.classList.remove('hidden');
+                mainGrid.classList.remove('settings-hidden');
+                toggleSettingsBtn.textContent = '☰ Options';
+                
+                // Show overlay and disable display panel
+                settingsOverlay.style.display = 'block';
+                displayPanel.style.opacity = '0.3';
+                displayPanel.style.pointerEvents = 'none';
+                displayPanel.style.filter = 'blur(3px)';
+                
+                // Pause audio detection if active
+                if (isListening) {
+                    stopAudioDetection();
+                    // Remember it was active
+                    window._wasListening = true;
+                }
+            } else {
+                settingsPanel.classList.add('hidden');
+                mainGrid.classList.add('settings-hidden');
+                toggleSettingsBtn.textContent = '☰ Afficher Options';
+                
+                // Hide overlay and enable display panel
+                settingsOverlay.style.display = 'none';
+                displayPanel.style.opacity = '1';
+                displayPanel.style.pointerEvents = 'auto';
+                displayPanel.style.filter = 'none';
+                
+                // Resume audio detection if it was active
+                if (window._wasListening && enableAudioCheckbox.checked) {
+                    audioDetector.style.display = 'block';
+                    startAudioDetection();
+                    window._wasListening = false;
+                }
+            }
+        });
+
 
 
 
         // Reset chord pool when chord type selection changes
 
+        // Fretboard visualization functions
+        function initializeEnabledStrings() {
+            const instrument = instrumentTunings[instrumentType.value];
+            enabledStrings = {};
+            instrument.strings.forEach((stringName, index) => {
+                enabledStrings[index] = true; // All strings enabled by default
+            });
+        }
+        
+        function toggleString(stringIndex) {
+            enabledStrings[stringIndex] = !enabledStrings[stringIndex];
+            // Redraw fretboard
+            if (currentExercise && currentExercise.type === 'single') {
+                drawFretboard(currentExercise.notes[0].note);
+            }
+        }
+        
+        // Make toggleString accessible globally for onclick handlers
+        window.toggleString = toggleString;
+        
+        function findNoteOnFretboard(noteName) {
+            const instrument = instrumentTunings[instrumentType.value];
+            const positions = [];
+            const maxFret = parseInt(fretCount.value);
+            
+            // For each string (only if enabled)
+            instrument.notes.forEach((openNote, stringIndex) => {
+                if (!enabledStrings[stringIndex]) return; // Skip disabled strings
+                
+                // Find note positions on this string
+                const openNoteIndex = allNotes.indexOf(openNote);
+                const targetNoteIndex = allNotes.indexOf(noteName);
+                
+                // Calculate fret positions (considering octaves)
+                for (let fret = 0; fret <= maxFret; fret++) {
+                    const fretNoteIndex = (openNoteIndex + fret) % 12;
+                    if (fretNoteIndex === targetNoteIndex) {
+                        positions.push({
+                            string: stringIndex,
+                            fret: fret,
+                            stringName: instrument.strings[stringIndex]
+                        });
+                    }
+                }
+            });
+            
+            return positions;
+        }
+        
+        function drawFretboard(noteName) {
+            if (!showFretboardCheckbox.checked) {
+                fretboardDisplay.style.display = 'none';
+                return;
+            }
+            
+            fretboardDisplay.style.display = 'block';
+            const positions = findNoteOnFretboard(noteName);
+            const instrument = instrumentTunings[instrumentType.value];
+            const numStrings = instrument.strings.length;
+            const numFrets = parseInt(fretCount.value);
+            
+            // Adjust cell width based on number of frets for better visibility
+            const cellWidth = numFrets <= 12 ? 50 : (numFrets <= 15 ? 45 : 40);
+            const minWidth = (numFrets + 1) * cellWidth + 60; // +60 for string names
+            
+            // Build HTML for fretboard
+            let html = `<div style="display: inline-block; min-width: ${minWidth}px; width: max-content;">`;
+            
+            // Fret numbers header
+            html += '<div style="display: flex; align-items: center; margin-bottom: 0.25rem;">';
+            html += '<div style="width: 50px;"></div>'; // Spacing for string names
+            
+            for (let fret = 0; fret <= numFrets; fret++) {
+                html += `<div style="width: ${cellWidth}px; text-align: center; font-size: 0.7rem; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;">${fret}</div>`;
+            }
+            html += '</div>';
+            
+            // Draw strings (from high to low for visual clarity)
+            for (let s = numStrings - 1; s >= 0; s--) {
+                const isEnabled = enabledStrings[s];
+                const opacity = isEnabled ? '1' : '0.3';
+                
+                html += '<div style="display: flex; align-items: center; margin-bottom: 0.5rem;">';
+                
+                // String name - clickable with French notation
+                const stringNoteFr = instrument.notesFr[s];
+                const stringNum = instrument.strings[s].match(/\d+/)[0]; // Extract octave number
+                html += `<div onclick="toggleString(${s})" style="width: 50px; text-align: right; padding-right: 0.5rem; font-size: 0.8rem; color: ${isEnabled ? 'var(--accent-primary)' : 'var(--text-secondary)'}; font-family: 'JetBrains Mono', monospace; cursor: pointer; user-select: none; transition: all 0.2s;" title="Cliquer pour ${isEnabled ? 'désactiver' : 'activer'}">${stringNoteFr}${stringNum}</div>`;
+                
+                // Frets
+                for (let f = 0; f <= numFrets; f++) {
+                    // Check if this position has the target note
+                    const isHighlight = isEnabled && positions.some(pos => pos.string === s && pos.fret === f);
+                    const bgColor = isHighlight ? 'var(--accent-primary)' : (f === 0 ? 'var(--bg-primary)' : 'transparent');
+                    const borderColor = f === 0 ? 'var(--border)' : 'var(--text-secondary)';
+                    const size = isHighlight ? '18px' : '10px';
+                    
+                    html += `<div style="width: ${cellWidth}px; height: 30px; display: flex; align-items: center; justify-content: center; border-left: ${f === 0 ? '3' : '1'}px solid ${borderColor}; position: relative; opacity: ${opacity};">`;
+                    
+                    if (isHighlight) {
+                        html += `<div style="width: ${size}; height: ${size}; border-radius: 50%; background: ${bgColor}; box-shadow: 0 0 10px var(--accent-primary); border: 2px solid var(--bg-primary);"></div>`;
+                    } else if (f > 0 && isEnabled) {
+                        // Fret markers - adapted for different fretboard lengths
+                        const standardMarkers = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24];
+                        const doubleMarkers = [12, 24];
+                        
+                        if (standardMarkers.includes(f) && s === Math.floor(numStrings / 2)) {
+                            html += `<div style="width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); opacity: 0.3;"></div>`;
+                        } else if (doubleMarkers.includes(f) && (s === Math.floor(numStrings / 2) || s === Math.floor(numStrings / 2) - 1)) {
+                            html += `<div style="width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); opacity: 0.3;"></div>`;
+                        }
+                    }
+                    
+                    html += '</div>';
+                }
+                
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            
+            // Display info about number of positions
+            const enabledCount = Object.values(enabledStrings).filter(v => v).length;
+            html += `<div style="margin-top: 0.75rem; text-align: center; font-size: 0.85rem; color: var(--accent-primary); font-family: 'JetBrains Mono', monospace;">`;
+            html += `${positions.length} position${positions.length > 1 ? 's' : ''} trouvée${positions.length > 1 ? 's' : ''} (${enabledCount}/${numStrings} cordes actives, ${numFrets} frettes)`;
+            html += '</div>';
+            
+            html += `<div style="margin-top: 0.5rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary); font-style: italic;">`;
+            html += `💡 Cliquez sur le nom d'une corde pour l'activer/désactiver`;
+            html += '</div>';
+            
+            fretboardCanvas.innerHTML = html;
+        }
+
+        // Speed mode functions
+        function startSpeedMode() {
+            speedModeActive = true;
+            speedModeCorrectCount = 0;
+            speedModeTimeRemaining = parseInt(speedModeDurationInput.value);
+            speedModeStartTime = Date.now();
+            
+            // Update UI
+            speedModeScore.textContent = '0';
+            speedModeTimer.textContent = speedModeTimeRemaining;
+            speedModeStartBtn.textContent = '■ Arrêter';
+            speedModeStartBtn.onclick = stopSpeedMode;
+            
+            // Make sure audio is enabled
+            if (!enableAudioCheckbox.checked) {
+                enableAudioCheckbox.checked = true;
+                audioDetector.style.display = 'block';
+                startAudioDetection();
+            }
+            
+            // Start timer
+            speedModeTimerInterval = setInterval(() => {
+                speedModeTimeRemaining--;
+                speedModeTimer.textContent = speedModeTimeRemaining;
+                
+                // Change color when time is running out
+                if (speedModeTimeRemaining <= 10) {
+                    speedModeTimer.style.color = 'var(--accent-danger)';
+                } else if (speedModeTimeRemaining <= 30) {
+                    speedModeTimer.style.color = 'var(--accent-warning)';
+                }
+                
+                if (speedModeTimeRemaining <= 0) {
+                    endSpeedMode();
+                }
+            }, 1000);
+            
+            // Generate first note
+            generateExercise();
+        }
+        
+        function stopSpeedMode() {
+            speedModeActive = false;
+            
+            if (speedModeTimerInterval) {
+                clearInterval(speedModeTimerInterval);
+                speedModeTimerInterval = null;
+            }
+            
+            // Reset UI
+            speedModeTimeRemaining = parseInt(speedModeDurationInput.value);
+            speedModeTimer.textContent = speedModeTimeRemaining;
+            speedModeScore.textContent = '0';
+            speedModeCorrectCount = 0;
+            speedModeStartBtn.textContent = '▶ Démarrer le défi';
+            speedModeStartBtn.onclick = startSpeedMode;
+            speedModeTimer.style.color = 'var(--accent-primary)';
+        }
+        
+        function endSpeedMode() {
+            stopSpeedMode();
+            
+            // Show final score
+            const timeElapsed = (Date.now() - speedModeStartTime) / 1000;
+            const notesPerMinute = Math.round((speedModeCorrectCount / timeElapsed) * 60);
+            
+            alert(`🎉 Défi terminé !\n\nScore : ${speedModeCorrectCount} notes correctes\nVitesse : ${notesPerMinute} notes/min`);
+        }
+        
+        function incrementSpeedModeScore() {
+            if (speedModeActive) {
+                speedModeCorrectCount++;
+                speedModeScore.textContent = speedModeCorrectCount;
+            }
+        }
+
         // Initialize
+        initializeEnabledStrings();
         generateExercise();
         
-        // Register Service Worker for PWA
-        if ('serviceWorker' in navigator) {
+        // Display version number
+        document.getElementById('appVersion').textContent = APP_VERSION;
+        
+        // Speed mode start button
+        speedModeStartBtn.onclick = startSpeedMode;
+        
+        // Auto-start microphone if checkbox is checked (default)
+        if (enableAudioCheckbox.checked) {
+            audioDetector.style.display = 'block';
+            startAudioDetection();
+        }
+        
+        // Register Service Worker for PWA (only on proper domains)
+        if ('serviceWorker' in navigator && isValidDomain) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js')
                     .then(registration => {

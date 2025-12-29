@@ -1,6 +1,7 @@
 {
   "name": "Guitar Trainer Pro",
   "short_name": "Guitar Trainer",
+  "version": "1.1.0",
   "description": "Application d'entraînement pour guitare avec détection audio en temps réel",
   "start_url": "./index.html",
   "display": "standalone",

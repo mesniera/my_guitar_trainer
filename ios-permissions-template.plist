@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Microphone permission for audio detection -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Guitar Trainer Pro needs access to your microphone to detect the notes you play on your guitar.</string>
+    
+    <!-- Display name -->
+    <key>CFBundleDisplayName</key>
+    <string>Guitar Trainer Pro</string>
+    
+    <!-- Prevent screen lock during use -->
+    <key>UIRequiresPersistentWiFi</key>
+    <false/>
+    
+    <!-- Supported orientations -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    
+    <!-- Status bar style -->
+    <key>UIStatusBarStyle</key>
+    <string>UIStatusBarStyleLightContent</string>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+</dict>
+</plist>

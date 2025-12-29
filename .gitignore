@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+build/
+www/
+
+# iOS
+ios/App/Pods/
+ios/App/build/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+DerivedData/
+*.mobileprovision
+*.p12
+
+# Android
+android/app/build/
+android/.gradle/
+*.keystore
+
+# Capacitor
+.capacitor/
+
+# System files
+.DS_Store
+Thumbs.db
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment variables (si vous en avez)
+.env
+.env.local
+
+# Temporary files
+*.tmp
+*.temp
+~$*
