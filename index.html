@@ -323,17 +323,17 @@
         }
 
         .chord-notes-display {
-            margin-top: 1.5rem;
-            padding: 1.5rem;
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
             background: var(--bg-tertiary);
-            border-radius: 12px;
+            border-radius: 8px;
             border: 2px solid var(--border);
         }
 
         .chord-display-wrapper {
             display: flex;
             gap: 2rem;
-            align-items: flex-start;
+            align-items: center;
             justify-content: center;
         }
 
@@ -342,25 +342,24 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            min-height: 200px;
         }
 
         .chord-notes-label {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            margin-bottom: 1rem;
-            text-align: left;
+            margin-bottom: 0.25rem;
+            text-align: center;
         }
 
         .chord-notes-value {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 1.1rem;
+            font-size: 0.95rem;
             color: var(--accent-primary);
             font-weight: 600;
-            text-align: left;
-            line-height: 1.6;
+            text-align: center;
+            line-height: 1.4;
         }
 
         .chord-diagram-section {
@@ -691,7 +690,7 @@
         <button id="toggleSettingsBtn" style="position: fixed; top: 1rem; left: 1rem; z-index: 1000; padding: 0.75rem 1rem; background: var(--bg-secondary); border: 2px solid var(--accent-primary); border-radius: 10px; color: var(--accent-primary); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);"
         onmouseover="this.style.background='var(--accent-primary)'; this.style.color='var(--bg-primary)'"
         onmouseout="this.style.background='var(--bg-secondary)'; this.style.color='var(--accent-primary)'">
-            ☰ Afficher Options
+            ⚙️
         </button>
         
         <header>
@@ -699,9 +698,9 @@
             <p class="subtitle">Entraînement avancé avec détection audio</p>
         </header>
 
-        <div class="main-grid settings-hidden" id="mainGrid">
+        <div class="main-grid" id="mainGrid">
             <!-- Settings Panel -->
-            <div class="settings-panel hidden" id="settingsPanel">
+            <div class="settings-panel" id="settingsPanel">
                 <!-- 1. Mode d'exercice -->
                 <div class="section-title">Mode d'exercice</div>
                 <div class="mode-selector">
@@ -710,6 +709,9 @@
                     </button>
                     <button class="mode-btn" data-mode="speed">
                         ⚡ Mode rapidité
+                    </button>
+                    <button class="mode-btn" data-mode="chords">
+                        🎼 Accords
                     </button>
                 </div>
 
@@ -739,6 +741,31 @@
                     <div class="setting-group">
                         <label class="setting-label">Durée du défi (secondes)</label>
                         <input type="number" id="speedModeDuration" min="30" max="300" step="30" value="60">
+                    </div>
+                </div>
+
+                <!-- 3b. Mode accords (conditionnel) -->
+                <div id="chordsModeSettings" style="display: none;">
+                    <div class="section-title">Mode accords</div>
+                    <div class="setting-group">
+                        <label class="setting-label">Types d'accords</label>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <label class="checkbox-label" style="margin: 0;">
+                                <input type="checkbox" id="chordTypeMajor" checked>
+                                <span>Majeur</span>
+                            </label>
+                            <label class="checkbox-label" style="margin: 0;">
+                                <input type="checkbox" id="chordTypeMinor" checked>
+                                <span>Mineur</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <label class="setting-label">Niveau</label>
+                        <select id="chordsLevel" style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 2px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'DM Sans', sans-serif; font-size: 0.9rem;">
+                            <option value="basic" selected>🌱 Basiques (5 accords)</option>
+                            <option value="complete">📚 Complet (12 tonalités)</option>
+                        </select>
                     </div>
                 </div>
 
@@ -801,7 +828,7 @@
             <!-- Display Panel -->
             <div class="display-panel">
                 <!-- Settings open overlay message -->
-                <div id="settingsOverlay" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; text-align: center; background: var(--bg-secondary); padding: 2rem; border-radius: 16px; border: 2px solid var(--accent-primary); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);">
+                <div id="settingsOverlay" style="display: block; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; text-align: center; background: var(--bg-secondary); padding: 2rem; border-radius: 16px; border: 2px solid var(--accent-primary); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);">
                     <div style="font-size: 1.2rem; color: var(--accent-primary); margin-bottom: 0.5rem;">⚙️ Configuration en cours</div>
                     <div style="font-size: 0.9rem; color: var(--text-secondary);">Fermez les options pour commencer l'entraînement</div>
                 </div>
@@ -828,16 +855,18 @@
                         </button>
                     </div>
                     
-                    <div class="current-note" id="currentNote">—</div>
-                    
-                    <div class="note-notation">
-                        <div class="notation">
-                            <div class="notation-label">Internationale</div>
-                            <div class="notation-value" id="intlNotation">—</div>
-                        </div>
-                        <div class="notation">
-                            <div class="notation-label">Française</div>
-                            <div class="notation-value" id="frNotation">—</div>
+                    <div id="singleNoteDisplay">
+                        <div class="current-note" id="currentNote">—</div>
+                        
+                        <div class="note-notation">
+                            <div class="notation">
+                                <div class="notation-label">Internationale</div>
+                                <div class="notation-value" id="intlNotation">—</div>
+                            </div>
+                            <div class="notation">
+                                <div class="notation-label">Française</div>
+                                <div class="notation-value" id="frNotation">—</div>
+                            </div>
                         </div>
                     </div>
 
@@ -850,19 +879,8 @@
                     <div class="chord-notes-display" id="chordNotesDisplay" style="display: none;">
                         <div class="chord-display-wrapper">
                             <div class="chord-notes-section">
-                                <div class="chord-notes-label">Notes de l'accord</div>
-                                <div class="chord-notes-value" id="chordNotesValue">—</div>
-                            </div>
-                            <div class="chord-diagram-section" id="chordDiagramContainer">
-                                <div class="diagram-header">
-                                    <div class="chord-diagram-label">Position sur le manche</div>
-                                    <div class="diagram-navigation">
-                                        <button class="diagram-nav-btn" id="prevPositionBtn">←</button>
-                                        <span class="position-indicator" id="positionIndicator">1/1</span>
-                                        <button class="diagram-nav-btn" id="nextPositionBtn">→</button>
-                                    </div>
-                                </div>
-                                <div class="chord-diagram" id="chordDiagram"></div>
+                                <div class="chord-notes-label">Progression</div>
+                                <div class="chord-notes-value" id="chordNotesValue">0/3 notes détectées</div>
                             </div>
                         </div>
                     </div>
@@ -887,7 +905,7 @@
 
     <script>
         // Application version
-        const APP_VERSION = 'v1.1.3';
+        const APP_VERSION = 'v1.4.4';
         
         // CRITICAL: Check domain FIRST and unregister any existing service worker on invalid domains
         const hostname = window.location.hostname;
@@ -939,6 +957,105 @@
             'sus2': { suffix: 'sus2', intervals: [0, 2, 7], french: 'Suspendu 2' }
         };
 
+        // Chord diagrams database (basic chords for training mode)
+        // Format: frets = [-1 (X), 0 (open), 1-24 (fret number)]
+        //         fingers = [0 (X/open), 1-4 (finger number)]
+        const chordDiagrams = {
+            // MAJOR CHORDS
+            'C': { 
+                name: 'Do Majeur', 
+                notes: ['C', 'E', 'G'],
+                frets: [-1, 3, 2, 0, 1, 0], // X-3-2-0-1-0
+                fingers: [0, 3, 2, 0, 1, 0] // Index on B, Middle on D, Ring on A
+            },
+            'D': {
+                name: 'Ré Majeur',
+                notes: ['D', 'F#', 'A'],
+                frets: [-1, -1, 0, 2, 3, 2],
+                fingers: [0, 0, 0, 1, 3, 2]
+            },
+            'E': {
+                name: 'Mi Majeur',
+                notes: ['E', 'G#', 'B'],
+                frets: [0, 2, 2, 1, 0, 0],
+                fingers: [0, 2, 3, 1, 0, 0]
+            },
+            'F': {
+                name: 'Fa Majeur',
+                notes: ['F', 'A', 'C'],
+                frets: [1, 3, 3, 2, 1, 1],
+                fingers: [1, 3, 4, 2, 1, 1] // Barré index
+            },
+            'G': {
+                name: 'Sol Majeur',
+                notes: ['G', 'B', 'D'],
+                frets: [3, 2, 0, 0, 0, 3],
+                fingers: [2, 1, 0, 0, 0, 3]
+            },
+            'A': {
+                name: 'La Majeur',
+                notes: ['A', 'C#', 'E'],
+                frets: [-1, 0, 2, 2, 2, 0],
+                fingers: [0, 0, 1, 2, 3, 0]
+            },
+            'B': {
+                name: 'Si Majeur',
+                notes: ['B', 'D#', 'F#'],
+                frets: [-1, 2, 4, 4, 4, 2],
+                fingers: [0, 1, 2, 3, 4, 1] // Barré
+            },
+            
+            // MINOR CHORDS
+            'Am': {
+                name: 'La Mineur',
+                notes: ['A', 'C', 'E'],
+                frets: [-1, 0, 2, 2, 1, 0],
+                fingers: [0, 0, 2, 3, 1, 0]
+            },
+            'Dm': {
+                name: 'Ré Mineur',
+                notes: ['D', 'F', 'A'],
+                frets: [-1, -1, 0, 2, 3, 1],
+                fingers: [0, 0, 0, 2, 3, 1]
+            },
+            'Em': {
+                name: 'Mi Mineur',
+                notes: ['E', 'G', 'B'],
+                frets: [0, 2, 2, 0, 0, 0],
+                fingers: [0, 1, 2, 0, 0, 0]
+            },
+            'Fm': {
+                name: 'Fa Mineur',
+                notes: ['F', 'G#', 'C'],
+                frets: [1, 3, 3, 1, 1, 1],
+                fingers: [1, 3, 4, 1, 1, 1] // Barré
+            },
+            'Gm': {
+                name: 'Sol Mineur',
+                notes: ['G', 'A#', 'D'],
+                frets: [3, 5, 5, 3, 3, 3],
+                fingers: [1, 3, 4, 1, 1, 1] // Barré
+            },
+            'Bm': {
+                name: 'Si Mineur',
+                notes: ['B', 'D', 'F#'],
+                frets: [-1, 2, 4, 4, 3, 2],
+                fingers: [0, 1, 3, 4, 2, 1] // Barré
+            },
+            'Cm': {
+                name: 'Do Mineur',
+                notes: ['C', 'D#', 'G'],
+                frets: [-1, 3, 5, 5, 4, 3],
+                fingers: [0, 1, 3, 4, 2, 1] // Barré
+            }
+        };
+
+        // Basic chords list (for beginner level)
+        const basicChords = ['C', 'D', 'E', 'G', 'A', 'Am', 'Dm', 'Em'];
+
+        // All chords for complete level
+        const allChordsList = Object.keys(chordDiagrams);
+
         // State
         let currentMode = 'single';
         let currentDifficulty = 'intermediate';
@@ -980,6 +1097,8 @@
         let analyser = null;
         let microphone = null;
         let isListening = false;
+        let microphoneStream = null; // Store the stream to reuse it
+        let microphonePermissionGranted = false; // Track if permission was already obtained
         let usedNotes = [];
         let availableNotes = [];
         let usedChords = [];
@@ -988,12 +1107,18 @@
         let currentChordName = null;
         let lastDetectedNote = null;
         let noteDetectionStartTime = 0;
-        let stableNoteDuration = 200; // 200 milliseconds
+        let stableNoteDuration = 100; // 100 milliseconds (responsive but stable)
         let hasAutoAdvanced = false;
         let waitingForRelease = false;
         let wakeLock = null;
         let audioContextSynth = null;
         let playNoteSound = true; // Toggle to enable/disable sound playback
+        
+        // Chord mode variables
+        let chordNotesDetected = []; // Track which notes of the chord have been detected
+        let chordStringsPlayed = []; // Track which string indices have been played (to prevent counting same string multiple times)
+        let chordModeLevel = 'basic'; // 'basic' or 'complete'
+        let chordTypesEnabled = { major: true, minor: true };
         
         // Speed mode variables
         let speedModeActive = false;
@@ -1065,6 +1190,14 @@
         const settingsOverlay = document.getElementById('settingsOverlay');
         const displayPanel = document.querySelector('.display-panel');
         const speedModeSettings = document.getElementById('speedModeSettings');
+        const chordsModeSettings = document.getElementById('chordsModeSettings');
+        const chordTypeMajor = document.getElementById('chordTypeMajor');
+        const chordTypeMinor = document.getElementById('chordTypeMinor');
+        const chordsLevel = document.getElementById('chordsLevel');
+        const singleNoteDisplay = document.getElementById('singleNoteDisplay');
+        const chordNotesDisplay = document.getElementById('chordNotesDisplay');
+        const chordNotesValue = document.getElementById('chordNotesValue');
+        const chordDiagram = document.getElementById('chordDiagram');
         const controlButtons = document.getElementById('controlButtons');
 
         // Chord shapes database - format: [fret positions for strings 1-6 (e to E), finger numbers]
@@ -1454,17 +1587,32 @@
                 // Reset pools when changing mode
                 availableNotes = [];
                 availableChords = [];
+                chordNotesDetected = [];
                 
-                // Show/hide speed mode UI
+                // Show/hide mode-specific UI
                 if (currentMode === 'speed') {
                     speedModeStats.style.display = 'block';
                     speedModeSettings.style.display = 'block';
-                    controlButtons.style.display = 'none'; // Hide Suivant button
-                    stopSpeedMode(); // Reset if was running
+                    chordsModeSettings.style.display = 'none';
+                    controlButtons.style.display = 'none';
+                    singleNoteDisplay.style.display = 'block';
+                    chordNotesDisplay.style.display = 'none';
+                    stopSpeedMode();
+                } else if (currentMode === 'chords') {
+                    speedModeStats.style.display = 'none';
+                    speedModeSettings.style.display = 'none';
+                    chordsModeSettings.style.display = 'block';
+                    controlButtons.style.display = 'flex';
+                    singleNoteDisplay.style.display = 'block'; // Show for chord name display
+                    chordNotesDisplay.style.display = 'block'; // Show chord notes info
+                    stopSpeedMode();
                 } else {
                     speedModeStats.style.display = 'none';
                     speedModeSettings.style.display = 'none';
-                    controlButtons.style.display = 'flex'; // Show Suivant button
+                    chordsModeSettings.style.display = 'none';
+                    controlButtons.style.display = 'flex';
+                    singleNoteDisplay.style.display = 'block';
+                    chordNotesDisplay.style.display = 'none';
                     stopSpeedMode();
                 }
                 
@@ -1510,22 +1658,36 @@
         }
 
         function initializeChordsPool() {
-            // Get selected chord types
-            const selectedTypes = Array.from(document.querySelectorAll('.chord-type-checkbox:checked'))
-                .map(cb => cb.value);
+            // Build list of chords based on level and selected types
+            const level = chordsLevel.value; // 'basic' or 'complete'
+            const includeMajor = chordTypeMajor.checked;
+            const includeMinor = chordTypeMinor.checked;
             
-            if (selectedTypes.length === 0) {
-                return []; // Return empty if no types selected
+            if (!includeMajor && !includeMinor) {
+                return []; // No types selected
             }
             
-            // Generate chords only for selected types (12 notes × selected types)
-            const chords = [];
-            allNotes.forEach(root => {
-                selectedTypes.forEach(chordType => {
-                    chords.push({ root, type: chordType });
-                });
-            });
-            return chords;
+            let chordsList = [];
+            
+            if (level === 'basic') {
+                // Basic chords: C, D, E, G, A, Am, Dm, Em
+                if (includeMajor) {
+                    chordsList.push('C', 'D', 'E', 'G', 'A');
+                }
+                if (includeMinor) {
+                    chordsList.push('Am', 'Dm', 'Em');
+                }
+            } else {
+                // Complete: all chords in database
+                if (includeMajor) {
+                    chordsList.push('C', 'D', 'E', 'F', 'G', 'A', 'B');
+                }
+                if (includeMinor) {
+                    chordsList.push('Am', 'Bm', 'Cm', 'Dm', 'Em', 'Fm', 'Gm');
+                }
+            }
+            
+            return chordsList;
         }
 
         function getRandomNote() {
@@ -1624,26 +1786,52 @@
         }
 
         function generateChord() {
-            const chord = getRandomChord();
-            const chordInfo = chordTypes[chord.type];
+            const chordName = getRandomChord();
             
-            // Get the notes in the chord
-            const rootIndex = allNotes.indexOf(chord.root);
-            const chordNotes = chordInfo.intervals.map(interval => {
-                const noteIndex = (rootIndex + interval) % 12;
-                return allNotes[noteIndex];
-            });
+            if (!chordName || !chordDiagrams[chordName]) {
+                console.error('Chord not found:', chordName);
+                return;
+            }
+            
+            const chordData = chordDiagrams[chordName];
+            const instrument = instrumentTunings[instrumentType.value];
+            const numStrings = instrument.strings.length;
+            
+            // Adapt chord to current instrument (truncate or extend)
+            let adaptedFrets = [...chordData.frets];
+            let adaptedFingers = [...chordData.fingers];
+            
+            if (numStrings > adaptedFrets.length) {
+                // Add extra low strings (muted by default)
+                const extraStrings = numStrings - adaptedFrets.length;
+                for (let i = 0; i < extraStrings; i++) {
+                    adaptedFrets.push(-1); // Mute extra strings
+                    adaptedFingers.push(0);
+                }
+            } else if (numStrings < adaptedFrets.length) {
+                // Remove high strings to fit instrument
+                adaptedFrets = adaptedFrets.slice(0, numStrings);
+                adaptedFingers = adaptedFingers.slice(0, numStrings);
+            }
+            
+            // Count how many strings should be played (not muted = not -1)
+            const stringsToPlay = adaptedFrets.filter(f => f !== -1).length;
             
             currentExercise = {
                 type: 'chord',
                 chord: {
-                    root: chord.root,
-                    type: chord.type,
-                    suffix: chordInfo.suffix,
-                    french: chordInfo.french,
-                    notes: chordNotes
+                    name: chordName,
+                    displayName: chordData.name,
+                    notes: chordData.notes,
+                    frets: adaptedFrets,
+                    fingers: adaptedFingers,
+                    stringsToPlay: stringsToPlay // Total strings that must be played
                 }
             };
+            
+            // Reset detection tracking
+            chordNotesDetected = [];
+            chordStringsPlayed = [];
         }
 
         function updateDisplay() {
@@ -1675,16 +1863,189 @@
                 
                 // Play the note sound
                 playNote(note);
+            } else if (currentExercise.type === 'chord') {
+                // Display chord name in main display (like single notes)
+                const chord = currentExercise.chord;
+                currentNoteEl.textContent = chord.name;
+                
+                // Display chord notes in notation sections
+                intlNotationEl.textContent = chord.notes.join(' - ');
+                frNotationEl.textContent = chord.notes.map(n => noteToFrench[n]).join(' - ');
+                
+                // Show progress in the chord notes area
+                const progressText = `${chordNotesDetected.length}/${chord.stringsToPlay} cordes jouées`;
+                const notesList = chordNotesDetected.length > 0 ? ` (${[...new Set(chordNotesDetected)].join(', ')})` : '';
+                chordNotesValue.textContent = progressText + notesList;
+                
+                // Draw chord diagram on fretboard if enabled
+                drawChordFretboard(chord);
             }
+        }
+
+        function drawChordFretboard(chord) {
+            // Only display if checkbox is enabled (same as drawFretboard)
+            if (!showFretboardCheckbox.checked) {
+                fretboardDisplay.style.display = 'none';
+                return;
+            }
+            
+            fretboardDisplay.style.display = 'block';
+            
+            // Use same styling as drawFretboard
+            const instrument = instrumentTunings[instrumentType.value];
+            const numStrings = instrument.strings.length;
+            
+            // Get chord frets and fingers
+            const frets = chord.frets;
+            const fingers = chord.fingers;
+            
+            // Helper function to get the note at a given string and fret
+            const getNoteAtPosition = (stringIndex, fretNum) => {
+                const openNote = instrument.notes[stringIndex];
+                const openNoteIndex = allNotes.indexOf(openNote);
+                const noteIndex = (openNoteIndex + fretNum) % 12;
+                return allNotes[noteIndex];
+            };
+            
+            // Calculate the range needed for this chord
+            const hasOpenStrings = frets.some(f => f === 0); // Check for open strings
+            const playedFrets = frets.filter(f => f > 0); // Exclude muted (-1) and open (0)
+            const minFret = playedFrets.length > 0 ? Math.min(...playedFrets) : 0;
+            const maxFret = playedFrets.length > 0 ? Math.max(...playedFrets) : 3;
+            
+            // Determine start and end frets to display (show 5-6 frets total)
+            let startFret = 0;
+            let endFret = 5;
+            
+            if (hasOpenStrings) {
+                // If there are open strings, always start from fret 0
+                startFret = 0;
+                endFret = Math.max(5, maxFret + 1);
+            } else if (minFret > 0) {
+                // For barre chords without open strings, show from minFret-1
+                startFret = Math.max(0, minFret - 1);
+                endFret = Math.min(24, Math.max(startFret + 5, maxFret + 1));
+            }
+            
+            const numFrets = endFret - startFret;
+            
+            // Fixed cell width for chord display (always 50px for clarity)
+            const cellWidth = 50;
+            const minWidth = (numFrets + 1) * cellWidth + 60; // +60 for string names
+            
+            
+            // Build HTML for fretboard (same structure as drawFretboard)
+            let html = `<div style="display: inline-block; min-width: ${minWidth}px; width: max-content;">`;
+            
+            // Fret numbers header
+            html += '<div style="display: flex; align-items: center; margin-bottom: 0.25rem;">';
+            html += '<div style="width: 50px;"></div>'; // Spacing for string names
+            
+            for (let fret = startFret; fret <= endFret; fret++) {
+                html += `<div style="width: ${cellWidth}px; text-align: center; font-size: 0.7rem; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;">${fret}</div>`;
+            }
+            html += '</div>';
+            
+            // Draw strings (from high to low for visual clarity)
+            for (let s = numStrings - 1; s >= 0; s--) {
+                html += '<div style="display: flex; align-items: center; margin-bottom: 0.5rem;">';
+                
+                // String name - French notation
+                const stringNoteFr = instrument.notesFr[s];
+                const stringNum = instrument.strings[s].match(/\d+/)[0]; // Extract octave number
+                
+                // Check if string is muted for this chord
+                const isMuted = frets[s] === -1;
+                const stringColor = isMuted ? 'var(--accent-danger)' : 'var(--accent-primary)';
+                
+                html += `<div style="width: 50px; text-align: right; padding-right: 0.5rem; font-size: 0.8rem; color: ${stringColor}; font-family: 'JetBrains Mono', monospace; user-select: none;">${stringNoteFr}${stringNum}</div>`;
+                
+                // Frets
+                for (let f = startFret; f <= endFret; f++) {
+                    // Check if this is a chord position
+                    const isChordPosition = frets[s] === f;
+                    const fingerNum = isChordPosition ? fingers[s] : 0;
+                    
+                    // Check if this string has been played (for color highlighting)
+                    const isDetected = isChordPosition && chordStringsPlayed.includes(s);
+                    
+                    // Use green if detected, cyan if not yet detected
+                    const positionColor = isDetected ? 'var(--success)' : 'var(--accent-primary)';
+                    const bgColor = isChordPosition ? positionColor : (f === startFret ? 'var(--bg-primary)' : 'transparent');
+                    const borderColor = f === startFret ? 'var(--border)' : 'var(--text-secondary)';
+                    const size = isChordPosition ? '24px' : '10px';
+                    const glowColor = isDetected ? 'var(--success)' : 'var(--accent-primary)';
+                    
+                    html += `<div style="width: ${cellWidth}px; height: 30px; display: flex; align-items: center; justify-content: center; border-left: ${f === startFret ? '3' : '1'}px solid ${borderColor}; position: relative;">`;
+                    
+                    // Chord position - show finger number or open string
+                    if (isChordPosition) {
+                        if (fingerNum === 0 && f === 0) {
+                            // Open string - use a ring (green if detected)
+                            html += `<div style="width: ${size}; height: ${size}; border-radius: 50%; background: transparent; border: 3px solid ${positionColor}; box-shadow: 0 0 10px ${glowColor};"></div>`;
+                        } else {
+                            // Fingered position - solid circle with number (green if detected)
+                            html += `<div style="width: ${size}; height: ${size}; border-radius: 50%; background: ${bgColor}; box-shadow: 0 0 10px ${glowColor}; border: 2px solid var(--bg-primary); display: flex; align-items: center; justify-content: center; color: var(--bg-primary); font-weight: 700; font-size: 0.8rem;">${fingerNum}</div>`;
+                        }
+                    }
+                    // Muted string at nut
+                    else if (isMuted && f === startFret && startFret === 0) {
+                        html += `<div style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: var(--accent-danger); font-weight: 700; font-size: 1.2rem;">✕</div>`;
+                    }
+                    // Fret markers (only for relevant frets in the range)
+                    else if (f > 0) {
+                        const standardMarkers = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24];
+                        const doubleMarkers = [12, 24];
+                        
+                        if (standardMarkers.includes(f) && s === Math.floor(numStrings / 2)) {
+                            html += `<div style="width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); opacity: 0.3;"></div>`;
+                        } else if (doubleMarkers.includes(f) && (s === Math.floor(numStrings / 2) || s === Math.floor(numStrings / 2) - 1)) {
+                            html += `<div style="width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); opacity: 0.3;"></div>`;
+                        }
+                    }
+                    
+                    html += '</div>';
+                }
+                
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            
+            // Info display (same style as drawFretboard)
+            html += `<div style="margin-top: 0.75rem; text-align: center; font-size: 0.85rem; color: var(--accent-primary); font-family: 'JetBrains Mono', monospace;">`;
+            if (startFret === 0) {
+                html += `Position de l'accord (cases 0-${endFret})`;
+            } else {
+                html += `Position de l'accord (cases ${startFret}-${endFret})`;
+            }
+            html += '</div>';
+            
+            // Legend
+            html += `<div style="margin-top: 0.5rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary); font-style: italic;">`;
+            html += `💡 <span style="color: var(--accent-primary);">⬤ 1-4</span> = Doigt | <span style="color: var(--success);">◯</span> = Corde à vide | <span style="color: var(--accent-danger);">✕</span> = Muette`;
+            html += '</div>';
+            
+            fretboardCanvas.innerHTML = html;
         }
 
         // Audio detection
         async function startAudioDetection() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                // Only request microphone access if we don't have it yet
+                if (!microphoneStream) {
+                    microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    microphonePermissionGranted = true;
+                }
+                
+                // Create new audio context if needed
+                if (!audioContext || audioContext.state === 'closed') {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                // Create analyser and microphone node
                 analyser = audioContext.createAnalyser();
-                microphone = audioContext.createMediaStreamSource(stream);
+                microphone = audioContext.createMediaStreamSource(microphoneStream);
                 
                 analyser.fftSize = 4096;
                 microphone.connect(analyser);
@@ -1708,10 +2069,11 @@
                 console.error('Erreur microphone:', err);
                 alert('Impossible d\'accéder au microphone');
                 enableAudioCheckbox.checked = false;
+                microphonePermissionGranted = false;
             }
         }
 
-        function stopAudioDetection() {
+        function stopAudioDetection(fullStop = false) {
             if (microphone) {
                 microphone.disconnect();
                 microphone = null;
@@ -1720,6 +2082,14 @@
                 audioContext.close();
                 audioContext = null;
             }
+            
+            // Only stop the stream if explicitly requested (checkbox unchecked)
+            if (fullStop && microphoneStream) {
+                microphoneStream.getTracks().forEach(track => track.stop());
+                microphoneStream = null;
+                microphonePermissionGranted = false;
+            }
+            
             isListening = false;
             statusIndicator.classList.remove('active');
             statusText.textContent = 'Microphone désactivé';
@@ -1771,14 +2141,18 @@
                     // New note detected, reset timer and clear display
                     lastDetectedNote = note;
                     noteDetectionStartTime = currentTime;
+                    hasAutoAdvanced = false; // Reset for new note (important for chord mode)
                     detectedNoteEl.textContent = '—';
                     detectedNoteEl.className = 'detected-note';
                 } else {
-                    // Same note, check if it's been stable for 500ms
+                    // Same note, check if it's been stable
                     const elapsedTime = currentTime - noteDetectionStartTime;
                     
-                    if (elapsedTime >= stableNoteDuration) {
-                        // Note has been stable for 200ms, display it
+                    // Use shorter duration for chord mode (50ms) to detect fast strumming
+                    const requiredDuration = (currentExercise && currentExercise.type === 'chord') ? 50 : stableNoteDuration;
+                    
+                    if (elapsedTime >= requiredDuration) {
+                        // Note has been stable long enough, display it
                         detectedNoteEl.textContent = `${note} (${noteToFrench[note]})`;
                         
                         // Check if correct
@@ -1802,6 +2176,83 @@
                                     }, delayMs);
                                 }
                             } else {
+                                detectedNoteEl.className = 'detected-note incorrect';
+                                // Reset hasAutoAdvanced to allow detection to continue
+                                hasAutoAdvanced = false;
+                            }
+                        } else if (currentExercise && currentExercise.type === 'chord') {
+                            // Chord mode: check if note is part of the chord
+                            const chordNotes = currentExercise.chord.notes;
+                            const stringsToPlay = currentExercise.chord.stringsToPlay;
+                            const frets = currentExercise.chord.frets;
+                            
+                            if (chordNotes.includes(note)) {
+                                // Correct note from the chord
+                                detectedNoteEl.className = 'detected-note correct';
+                                
+                                // Only increment once per note detection (use hasAutoAdvanced to prevent multiple counts)
+                                if (!hasAutoAdvanced && chordStringsPlayed.length < stringsToPlay) {
+                                    hasAutoAdvanced = true; // Prevent counting again for same note
+                                    
+                                    // Find the next expected string (from low to high: index 5 → 0)
+                                    // Start from the lowest string (highest index) and go up
+                                    const instrument = instrumentTunings[instrumentType.value];
+                                    let stringFound = false;
+                                    
+                                    // Find next string to play (from low to high pitch: index 0 → 5)
+                                    // Index 0 = lowest pitch (E2 grave), Index 5 = highest pitch (E4 aigu)
+                                    let nextStringIndex = -1;
+                                    for (let s = 0; s < frets.length; s++) {
+                                        if (frets[s] !== -1 && !chordStringsPlayed.includes(s)) {
+                                            nextStringIndex = s;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    // Check if the detected note matches the next expected string
+                                    if (nextStringIndex >= 0) {
+                                        const openNote = instrument.notes[nextStringIndex];
+                                        const openNoteIndex = allNotes.indexOf(openNote);
+                                        const stringNoteIndex = (openNoteIndex + frets[nextStringIndex]) % 12;
+                                        const expectedNote = allNotes[stringNoteIndex];
+                                        
+                                        // If this matches the detected note, accept it
+                                        if (expectedNote === note) {
+                                            chordStringsPlayed.push(nextStringIndex);
+                                            chordNotesDetected.push(note);
+                                            stringFound = true;
+                                        }
+                                    }
+                                    
+                                    if (stringFound) {
+                                        // Update progress display in chord notes area
+                                        const progressText = `${chordStringsPlayed.length}/${stringsToPlay} cordes jouées`;
+                                        const notesList = [...new Set(chordNotesDetected)].join(', '); // Show unique notes detected
+                                        chordNotesValue.textContent = `${progressText} (${notesList})`;
+                                        
+                                        // Redraw fretboard if enabled to show updated legend
+                                        if (showFretboardCheckbox.checked) {
+                                            drawChordFretboard(currentExercise.chord);
+                                        }
+                                        
+                                        // Check if all strings have been played
+                                        if (chordStringsPlayed.length >= stringsToPlay) {
+                                            // All strings played, advance to next chord
+                                            const delayMs = parseFloat(advanceDelayInput.value) * 1000;
+                                            setTimeout(() => {
+                                                if (isListening) {
+                                                    generateExercise();
+                                                    hasAutoAdvanced = false;
+                                                }
+                                            }, delayMs);
+                                        }
+                                    } else {
+                                        // Note not in correct order - reset hasAutoAdvanced to allow next note
+                                        hasAutoAdvanced = false;
+                                    }
+                                }
+                            } else {
+                                // Wrong note
                                 detectedNoteEl.className = 'detected-note incorrect';
                             }
                         } else {
@@ -2057,7 +2508,7 @@
                 startAudioDetection();
             } else {
                 audioDetector.style.display = 'none';
-                stopAudioDetection();
+                stopAudioDetection(true); // Full stop - release the stream
             }
         });
 
@@ -2073,13 +2524,33 @@
             speedModeTimer.textContent = duration;
         });
 
+        // Chord mode controls
+        chordTypeMajor.addEventListener('change', () => {
+            availableChords = [];
+            if (currentMode === 'chords') generateExercise();
+        });
+
+        chordTypeMinor.addEventListener('change', () => {
+            availableChords = [];
+            if (currentMode === 'chords') generateExercise();
+        });
+
+        chordsLevel.addEventListener('change', () => {
+            availableChords = [];
+            if (currentMode === 'chords') generateExercise();
+        });
+
         showFretboardCheckbox.addEventListener('change', () => {
             if (showFretboardCheckbox.checked) {
                 instrumentSelection.style.display = 'block';
                 fretCountSelection.style.display = 'block';
-                // Redraw fretboard with current note
-                if (currentExercise && currentExercise.type === 'single') {
-                    drawFretboard(currentExercise.notes[0].note);
+                // Redraw fretboard with current exercise
+                if (currentExercise) {
+                    if (currentExercise.type === 'single') {
+                        drawFretboard(currentExercise.notes[0].note);
+                    } else if (currentExercise.type === 'chord') {
+                        drawChordFretboard(currentExercise.chord);
+                    }
                 }
             } else {
                 instrumentSelection.style.display = 'none';
@@ -2092,27 +2563,31 @@
             // Initialize enabled strings for new instrument
             initializeEnabledStrings();
             
-            // Redraw fretboard with new instrument
-            if (showFretboardCheckbox.checked && currentExercise && currentExercise.type === 'single') {
-                drawFretboard(currentExercise.notes[0].note);
+            // Regenerate exercise to adapt to new instrument string count
+            if (currentExercise) {
+                generateExercise();
             }
         });
 
         fretCount.addEventListener('change', () => {
             // Redraw fretboard with new fret count
-            if (showFretboardCheckbox.checked && currentExercise && currentExercise.type === 'single') {
-                drawFretboard(currentExercise.notes[0].note);
+            if (showFretboardCheckbox.checked && currentExercise) {
+                if (currentExercise.type === 'single') {
+                    drawFretboard(currentExercise.notes[0].note);
+                } else if (currentExercise.type === 'chord') {
+                    drawChordFretboard(currentExercise.chord);
+                }
             }
         });
 
         // Toggle settings panel
-        let settingsVisible = false; // Start with settings hidden
+        let settingsVisible = true; // Start with settings open
         toggleSettingsBtn.addEventListener('click', () => {
             settingsVisible = !settingsVisible;
             if (settingsVisible) {
                 settingsPanel.classList.remove('hidden');
                 mainGrid.classList.remove('settings-hidden');
-                toggleSettingsBtn.textContent = '☰ Options';
+                toggleSettingsBtn.textContent = '⚙️';
                 
                 // Show overlay and disable display panel
                 settingsOverlay.style.display = 'block';
@@ -2120,16 +2595,16 @@
                 displayPanel.style.pointerEvents = 'none';
                 displayPanel.style.filter = 'blur(3px)';
                 
-                // Pause audio detection if active
+                // Pause audio detection if active (but keep stream alive)
                 if (isListening) {
-                    stopAudioDetection();
+                    stopAudioDetection(false); // Don't release the stream
                     // Remember it was active
                     window._wasListening = true;
                 }
             } else {
                 settingsPanel.classList.add('hidden');
                 mainGrid.classList.add('settings-hidden');
-                toggleSettingsBtn.textContent = '☰ Afficher Options';
+                toggleSettingsBtn.textContent = '⚙️';
                 
                 // Hide overlay and enable display panel
                 settingsOverlay.style.display = 'none';
@@ -2137,12 +2612,30 @@
                 displayPanel.style.pointerEvents = 'auto';
                 displayPanel.style.filter = 'none';
                 
-                // Resume audio detection if it was active
-                if (window._wasListening && enableAudioCheckbox.checked) {
+                // Start audio detection if checkbox is enabled
+                // (either resuming after pause, or starting for the first time)
+                if (enableAudioCheckbox.checked && !isListening) {
                     audioDetector.style.display = 'block';
                     startAudioDetection();
-                    window._wasListening = false;
                 }
+                
+                // Clear the "was listening" flag
+                window._wasListening = false;
+            }
+        });
+
+        // Close settings when clicking outside the settings panel
+        document.addEventListener('click', (e) => {
+            // Only if settings are visible
+            if (!settingsVisible) return;
+            
+            // Check if click is outside settings panel and not on toggle button
+            const clickedInsideSettings = settingsPanel.contains(e.target);
+            const clickedToggleButton = toggleSettingsBtn.contains(e.target);
+            
+            if (!clickedInsideSettings && !clickedToggleButton) {
+                // Close settings (simulate button click)
+                toggleSettingsBtn.click();
             }
         });
 
@@ -2373,11 +2866,8 @@
         // Speed mode start button
         speedModeStartBtn.onclick = startSpeedMode;
         
-        // Auto-start microphone if checkbox is checked (default)
-        if (enableAudioCheckbox.checked) {
-            audioDetector.style.display = 'block';
-            startAudioDetection();
-        }
+        // Don't auto-start microphone since settings are open at startup
+        // Microphone will be started when user closes settings and begins training
         
         // Register Service Worker for PWA (only on proper domains)
         if ('serviceWorker' in navigator && isValidDomain) {
