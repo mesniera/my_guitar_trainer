@@ -773,7 +773,7 @@
                 <div class="section-title">Visualisation manche</div>
                 <div class="setting-group">
                     <label class="checkbox-label">
-                        <input type="checkbox" id="showFretboardCheckbox">
+                        <input type="checkbox" id="showFretboardCheckbox" checked>
                         <span>Afficher la position sur le manche</span>
                     </label>
                 </div>
@@ -802,6 +802,25 @@
                         <input type="checkbox" id="enableAudio" checked>
                         <span>Activer le microphone</span>
                     </label>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">Temps de grattage (ms)</label>
+                    <input type="number" id="strumDelay" min="200" max="1000" step="50" value="600">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                        Délai avant analyse de l'accord (200-1000ms)
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">Sensibilité de détection (dB)</label>
+                    <input type="range" id="detectionSensitivity" min="-80" max="-40" step="5" value="-60">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                        <span>Plus sensible</span>
+                        <span id="sensitivityValue">-60 dB</span>
+                        <span>Moins sensible</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                        Seuil minimum de détection du signal
+                    </div>
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">Délai avant passage (secondes)</label>
@@ -856,7 +875,10 @@
                     </div>
                     
                     <div id="singleNoteDisplay">
-                        <div class="current-note" id="currentNote">—</div>
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 1.5rem; flex-wrap: wrap;">
+                            <div class="current-note" id="currentNote">—</div>
+                            <div id="detectedChord" style="display: none; color: var(--accent-danger); font-size: 2.5rem; font-weight: 700; font-family: 'DM Sans', sans-serif;">—</div>
+                        </div>
                         
                         <div class="note-notation">
                             <div class="notation">
@@ -874,6 +896,15 @@
                     <div id="fretboardDisplay" style="display: none; margin-top: 1.5rem; width: 100%;">
                         <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem; text-align: center;">Position sur le manche</div>
                         <div id="fretboardCanvas" style="background: var(--bg-tertiary); padding: 1rem; border-radius: 12px; border: 2px solid var(--border); overflow-x: auto; max-width: 100%;"></div>
+                        
+                        <!-- Spectrum Visualizer (only in chord mode) -->
+                        <div id="spectrumDisplay" style="display: none; margin-top: 1rem;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem; text-align: center;">Spectre des fréquences</div>
+                            <canvas id="spectrumCanvas" width="800" height="200" style="width: 100%; max-width: 800px; height: auto; background: var(--bg-tertiary); border-radius: 8px; border: 2px solid var(--border); display: block; margin: 0 auto;"></canvas>
+                            <div style="margin-top: 0.5rem; text-align: center; font-size: 0.7rem; color: var(--text-secondary); font-style: italic;">
+                                🟢 Vert = Fréquences attendues | 🔵 Cyan = Spectre complet
+                            </div>
+                        </div>
                     </div>
 
                     <div class="chord-notes-display" id="chordNotesDisplay" style="display: none;">
@@ -905,7 +936,7 @@
 
     <script>
         // Application version
-        const APP_VERSION = 'v1.4.4';
+        const APP_VERSION = 'v4.1.0';
         
         // CRITICAL: Check domain FIRST and unregister any existing service worker on invalid domains
         const hostname = window.location.hostname;
@@ -1057,7 +1088,7 @@
         const allChordsList = Object.keys(chordDiagrams);
 
         // State
-        let currentMode = 'single';
+        let currentMode = 'chords';
         let currentDifficulty = 'intermediate';
         let currentExercise = null;
         
@@ -1109,6 +1140,15 @@
         let noteDetectionStartTime = 0;
         let stableNoteDuration = 100; // 100 milliseconds (responsive but stable)
         let hasAutoAdvanced = false;
+        let chordDetectionStartTime = 0; // When first notes detected
+        let chordTimeout = 2000; // After 2s without correct chord, reset and ask to retry
+        let chordAnalysisScheduled = false; // Flag to prevent multiple scheduled analyses
+        let globalBassNoteMissing = false; // Flag to persist bass missing state
+        let globalMissingBassNote = null; // Which bass note is missing
+        let frozenFFTData = null; // Store FFT data from analysis to freeze spectrum display
+        let lastChordAnalysisTime = 0; // Track when we last analyzed to avoid spam
+        
+        // chordAnalysisDelay is now dynamic - read from strumDelayInput
         let waitingForRelease = false;
         let wakeLock = null;
         let audioContextSynth = null;
@@ -1116,6 +1156,8 @@
         
         // Chord mode variables
         let chordNotesDetected = []; // Track which notes of the chord have been detected
+        let wrongNotesPlayed = []; // Track incorrect notes played
+        let wrongPositions = []; // Track exact positions (string, fret) of wrong notes
         let chordStringsPlayed = []; // Track which string indices have been played (to prevent counting same string multiple times)
         let chordModeLevel = 'basic'; // 'basic' or 'complete'
         let chordTypesEnabled = { major: true, minor: true };
@@ -1162,6 +1204,7 @@
         const modeButtons = document.querySelectorAll('.mode-btn');
         const nextBtn = document.getElementById('nextBtn');
         const currentNoteEl = document.getElementById('currentNote');
+        const detectedChordEl = document.getElementById('detectedChord');
         const intlNotationEl = document.getElementById('intlNotation');
         const frNotationEl = document.getElementById('frNotation');
         const detectedNoteEl = document.getElementById('detectedNote');
@@ -1170,6 +1213,9 @@
         const statusIndicator = document.getElementById('statusIndicator');
         const statusText = document.getElementById('statusText');
         const advanceDelayInput = document.getElementById('advanceDelay');
+        const strumDelayInput = document.getElementById('strumDelay');
+        const detectionSensitivityInput = document.getElementById('detectionSensitivity');
+        const sensitivityValueDisplay = document.getElementById('sensitivityValue');
         const playSoundCheckbox = document.getElementById('playSoundCheckbox');
         const speedModeDurationInput = document.getElementById('speedModeDuration');
         const speedModeStats = document.getElementById('speedModeStats');
@@ -1732,6 +1778,17 @@
             const selectedStrings = ['E4', 'B3', 'G3', 'D3', 'A2', 'E2'];
             const minFret = 0;
             const maxFret = 12;
+            
+            // Reset chord detection timer and flag for new exercise
+            chordDetectionStartTime = 0;
+            chordAnalysisScheduled = false; // Allow new analysis for next chord
+            frozenFFTData = null; // Clear frozen spectrum data
+            
+            // Clear previous detection results
+            window.lastDetectedNotesWithFreq = null;
+            wrongNotesPlayed = [];
+            wrongPositions = [];
+            chordNotesDetected = [];
 
             if (currentMode === 'single' || currentMode === 'speed') {
                 // Both single and speed modes use single notes
@@ -1817,6 +1874,31 @@
             // Count how many strings should be played (not muted = not -1)
             const stringsToPlay = adaptedFrets.filter(f => f !== -1).length;
             
+            // Calculate expected frequencies for each string
+            const expectedFrequencies = [];
+            for (let s = 0; s < adaptedFrets.length; s++) {
+                if (adaptedFrets[s] !== -1) { // Not muted
+                    const openNote = instrument.notes[s];
+                    const openNoteIndex = allNotes.indexOf(openNote);
+                    const stringNoteIndex = (openNoteIndex + adaptedFrets[s]) % 12;
+                    const stringNote = allNotes[stringNoteIndex];
+                    
+                    // Calculate exact frequency for this string
+                    // Find which octave we're in
+                    const openString = instrument.strings[s]; // e.g., "E2", "A2"
+                    const octave = parseInt(openString.match(/\d+/)[0]);
+                    const semitonesFromC0 = (octave * 12) + openNoteIndex + adaptedFrets[s];
+                    const frequency = 16.35 * Math.pow(2, semitonesFromC0 / 12); // C0 = 16.35 Hz
+                    
+                    expectedFrequencies.push({
+                        string: s,
+                        note: stringNote,
+                        frequency: frequency,
+                        fret: adaptedFrets[s]
+                    });
+                }
+            }
+            
             currentExercise = {
                 type: 'chord',
                 chord: {
@@ -1825,7 +1907,8 @@
                     notes: chordData.notes,
                     frets: adaptedFrets,
                     fingers: adaptedFingers,
-                    stringsToPlay: stringsToPlay // Total strings that must be played
+                    stringsToPlay: stringsToPlay, // Total strings that must be played
+                    expectedFrequencies: expectedFrequencies // Frequencies for each string
                 }
             };
             
@@ -1861,6 +1944,10 @@
                 // Draw fretboard if enabled
                 drawFretboard(note);
                 
+                // Hide spectrum in single note mode
+                const spectrumDisplay = document.getElementById('spectrumDisplay');
+                if (spectrumDisplay) spectrumDisplay.style.display = 'none';
+                
                 // Play the note sound
                 playNote(note);
             } else if (currentExercise.type === 'chord') {
@@ -1877,8 +1964,215 @@
                 const notesList = chordNotesDetected.length > 0 ? ` (${[...new Set(chordNotesDetected)].join(', ')})` : '';
                 chordNotesValue.textContent = progressText + notesList;
                 
+                // Show spectrum in chord mode
+                const spectrumDisplay = document.getElementById('spectrumDisplay');
+                if (spectrumDisplay) spectrumDisplay.style.display = 'block';
+                
                 // Draw chord diagram on fretboard if enabled
                 drawChordFretboard(chord);
+            }
+        }
+
+        function drawSpectrum(expectedFrequencies, fftData) {
+            const canvas = document.getElementById('spectrumCanvas');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Clear canvas
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, width, height);
+            
+            // Use pre-computed FFT data if provided, otherwise compute it
+            let dataArray, bufferLength, nyquist;
+            if (fftData) {
+                ({ dataArray, bufferLength, nyquist } = fftData);
+            } else {
+                // Fallback: compute FFT if not provided
+                const data = getFFTData();
+                dataArray = data.dataArray;
+                bufferLength = data.bufferLength;
+                nyquist = data.nyquist;
+            }
+            
+            // Draw frequency spectrum
+            const minFreq = 50;  // 50 Hz
+            const maxFreq = 600; // 600 Hz (better detail for guitar fundamentals)
+            const freqRange = maxFreq - minFreq;
+            
+            // Draw grid lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 10; i++) {
+                const y = (i / 10) * height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+            
+            // Draw spectrum bars
+            ctx.fillStyle = 'rgba(100, 200, 255, 0.6)'; // Cyan
+            const barWidth = width / bufferLength;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const freq = (i * nyquist) / bufferLength;
+                
+                if (freq >= minFreq && freq <= maxFreq) {
+                    const x = ((freq - minFreq) / freqRange) * width;
+                    const magnitude = dataArray[i];
+                    
+                    // Draw all spectrum data (no noise floor filter)
+                    const normalizedHeight = Math.max(0, (magnitude + 100) / 100); // -100dB to 0dB normalized
+                    const barHeight = normalizedHeight * height;
+                    
+                    ctx.fillRect(x, height - barHeight, barWidth * 2, barHeight);
+                }
+            }
+            
+            // Draw expected frequencies as vertical lines
+            if (expectedFrequencies && expectedFrequencies.length > 0) {
+                expectedFrequencies.forEach(expected => {
+                    // Draw fundamental and harmonics
+                    const harmonicsToShow = [
+                        { freq: expected.frequency, label: expected.note, note: expected.note, style: 'solid' },
+                        { freq: expected.frequency * 2, label: `${expected.note}×2`, note: expected.note, style: 'dashed' },
+                        { freq: expected.frequency / 2, label: `${expected.note}÷2`, note: expected.note, style: 'dotted' }
+                    ];
+                    
+                    harmonicsToShow.forEach(harmonic => {
+                        if (harmonic.freq >= minFreq && harmonic.freq <= maxFreq) {
+                            const x = ((harmonic.freq - minFreq) / freqRange) * width;
+                            
+                            // Check if this frequency is ACTUALLY detected at the right octave
+                            let isDetected = false;
+                            
+                            if (window.lastDetectedNotesWithFreq && harmonic.note) {
+                                // Check if note is detected within ±10% of expected frequency (not just by name)
+                                isDetected = window.lastDetectedNotesWithFreq.some(detected => {
+                                    if (detected.note !== harmonic.note) return false;
+                                    const freqRatio = detected.frequency / harmonic.freq;
+                                    return freqRatio >= 0.9 && freqRatio <= 1.1;
+                                });
+                            }
+                            
+                            // Fallback: also check raw magnitude at this frequency
+                            let maxMag = -100;
+                            const binIndex = Math.round((harmonic.freq * bufferLength) / nyquist);
+                            for (let offset = -2; offset <= 2; offset++) {
+                                const checkBin = binIndex + offset;
+                                if (checkBin >= 0 && checkBin < bufferLength) {
+                                    maxMag = Math.max(maxMag, dataArray[checkBin]);
+                                }
+                            }
+                            
+                            // Draw vertical line
+                            if (harmonic.style === 'solid') {
+                                // Fundamental - thick line
+                                ctx.strokeStyle = isDetected ? 'rgba(0, 255, 100, 0.9)' : 'rgba(255, 100, 100, 0.6)';
+                                ctx.lineWidth = 3;
+                            } else if (harmonic.style === 'dashed') {
+                                // Harmonic - dashed line
+                                ctx.strokeStyle = isDetected ? 'rgba(0, 255, 100, 0.5)' : 'rgba(255, 100, 100, 0.3)';
+                                ctx.lineWidth = 2;
+                                ctx.setLineDash([5, 5]);
+                            } else {
+                                // Sub-harmonic - dotted line
+                                ctx.strokeStyle = isDetected ? 'rgba(0, 255, 100, 0.4)' : 'rgba(255, 100, 100, 0.2)';
+                                ctx.lineWidth = 1;
+                                ctx.setLineDash([2, 3]);
+                            }
+                            
+                            ctx.beginPath();
+                            ctx.moveTo(x, 0);
+                            ctx.lineTo(x, height);
+                            ctx.stroke();
+                            ctx.setLineDash([]); // Reset dash
+                            
+                            // Draw label only for fundamental
+                            if (harmonic.style === 'solid') {
+                                ctx.fillStyle = isDetected ? '#00ff64' : '#ff6464';
+                                ctx.font = 'bold 12px monospace';
+                                ctx.textAlign = 'center';
+                                ctx.fillText(`${expected.note}`, x, 15);
+                                ctx.font = '10px monospace';
+                                ctx.fillText(`${Math.round(expected.frequency)}Hz`, x, 28);
+                                ctx.fillText(`${maxMag.toFixed(0)}dB`, x, height - 5);
+                            }
+                        }
+                    });
+                });
+            }
+            
+            // Draw ALL detected notes (even if not in expected chord)
+            if (window.lastDetectedNotesWithFreq && window.lastDetectedNotesWithFreq.length > 0) {
+                window.lastDetectedNotesWithFreq.forEach(detected => {
+                    if (detected.frequency >= minFreq && detected.frequency <= maxFreq) {
+                        const x = ((detected.frequency - minFreq) / freqRange) * width;
+                        
+                        // Check if this frequency is close to an expected frequency
+                        let isCloseToExpected = false;
+                        if (expectedFrequencies) {
+                            isCloseToExpected = expectedFrequencies.some(expected => {
+                                return Math.abs(detected.frequency - expected.frequency) < 15; // Within 15 Hz
+                            });
+                        }
+                        
+                        // Only draw if NOT close to an expected frequency (to avoid duplicates)
+                        if (!isCloseToExpected) {
+                            // Draw cyan vertical line for detected note (not in expected)
+                            ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+                            ctx.lineWidth = 2;
+                            ctx.setLineDash([3, 3]);
+                            ctx.beginPath();
+                            ctx.moveTo(x, 0);
+                            ctx.lineTo(x, height);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                            
+                            // Draw label at TOP (different from expected notes)
+                            ctx.fillStyle = '#00ffff';
+                            ctx.font = 'bold 11px monospace';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(`${detected.note}`, x, 75);
+                            ctx.font = '9px monospace';
+                            ctx.fillText(`${Math.round(detected.frequency)}Hz`, x, 86);
+                            
+                            // Add "PARASITE" indicator
+                            ctx.font = '8px monospace';
+                            ctx.fillStyle = 'rgba(0, 255, 255, 0.6)';
+                            ctx.fillText('⚠', x, 65);
+                        }
+                    }
+                });
+            }
+            
+            // Draw threshold lines
+            const thresholdY = height * (1 - ((-60 + 100) / 100)); // -60 dB threshold
+            ctx.strokeStyle = 'rgba(255, 200, 0, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 3]);
+            ctx.beginPath();
+            ctx.moveTo(0, thresholdY);
+            ctx.lineTo(width, thresholdY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Label threshold
+            ctx.fillStyle = 'rgba(255, 200, 0, 0.8)';
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText('Seuil: -60dB', width - 5, thresholdY - 3);
+            
+            // Draw frequency axis labels
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'left';
+            for (let freq = 100; freq <= maxFreq; freq += 100) {
+                const x = ((freq - minFreq) / freqRange) * width;
+                ctx.fillText(`${freq}Hz`, x, height - 5);
             }
         }
 
@@ -1906,6 +2200,99 @@
                 const noteIndex = (openNoteIndex + fretNum) % 12;
                 return allNotes[noteIndex];
             };
+            
+            // Helper function to get frequency at a given string and fret
+            const getFrequencyAtPosition = (stringIndex, fretNum) => {
+                const openNote = instrument.notes[stringIndex];
+                const openNoteIndex = allNotes.indexOf(openNote);
+                const noteIndex = (openNoteIndex + fretNum) % 12;
+                const noteName = allNotes[noteIndex];
+                
+                // Calculate octave based on string and fret
+                const stringBaseOctaves = [2, 2, 3, 3, 3, 4]; // Standard tuning octaves (E2, A2, D3, G3, B3, E4)
+                let octave = stringBaseOctaves[stringIndex];
+                
+                // Adjust octave based on fret
+                const semitones = fretNum;
+                octave += Math.floor((openNoteIndex + semitones) / 12);
+                
+                // Get base frequency for this note + octave
+                const noteFrequencies = {
+                    'C': [16.35, 32.70, 65.41, 130.81, 261.63, 523.25, 1046.50],
+                    'C#': [17.32, 34.65, 69.30, 138.59, 277.18, 554.37, 1108.73],
+                    'D': [18.35, 36.71, 73.42, 146.83, 293.66, 587.33, 1174.66],
+                    'D#': [19.45, 38.89, 77.78, 155.56, 311.13, 622.25, 1244.51],
+                    'E': [20.60, 41.20, 82.41, 164.81, 329.63, 659.25, 1318.51],
+                    'F': [21.83, 43.65, 87.31, 174.61, 349.23, 698.46, 1396.91],
+                    'F#': [23.12, 46.25, 92.50, 185.00, 369.99, 739.99, 1479.98],
+                    'G': [24.50, 49.00, 98.00, 196.00, 392.00, 783.99, 1567.98],
+                    'G#': [25.96, 51.91, 103.83, 207.65, 415.30, 830.61, 1661.22],
+                    'A': [27.50, 55.00, 110.00, 220.00, 440.00, 880.00, 1760.00],
+                    'A#': [29.14, 58.27, 116.54, 233.08, 466.16, 932.33, 1864.66],
+                    'B': [30.87, 61.74, 123.47, 246.94, 493.88, 987.77, 1975.53]
+                };
+                
+                return noteFrequencies[noteName] ? noteFrequencies[noteName][octave] : null;
+            };
+            
+            // Map detected frequencies to likely fretboard positions
+            const detectedPositions = new Set();
+            
+            console.log(`🎯 Mapping ${window.lastDetectedNotesWithFreq?.length || 0} detected frequencies to fretboard...`);
+            
+            if (window.lastDetectedNotesWithFreq && window.lastDetectedNotesWithFreq.length > 0) {
+                window.lastDetectedNotesWithFreq.forEach(detected => {
+                    console.log(`  📍 Trying to map: ${detected.note} @ ${detected.frequency.toFixed(1)}Hz`);
+                    
+                    // For each detected frequency, find all possible positions on fretboard
+                    let bestMatch = null;
+                    let bestDiff = Infinity;
+                    let allMatches = []; // Track all potential matches for debugging
+                    
+                    for (let s = 0; s < numStrings; s++) {
+                        const expectedFret = frets[s];
+                        if (expectedFret === -1) continue; // Skip muted strings
+                        
+                        // Check positions around the expected fret (±2 frets)
+                        for (let f = Math.max(0, expectedFret - 2); f <= Math.min(24, expectedFret + 2); f++) {
+                            const posFreq = getFrequencyAtPosition(s, f);
+                            if (!posFreq) continue;
+                            
+                            const diff = Math.abs(posFreq - detected.frequency);
+                            const percentDiff = diff / detected.frequency;
+                            
+                            // If frequency matches within 2% (allows slight tuning variance)
+                            if (percentDiff < 0.02) {
+                                allMatches.push({ string: s, fret: f, freq: posFreq, diff: diff });
+                                
+                                if (diff < bestDiff) {
+                                    bestDiff = diff;
+                                    bestMatch = { string: s, fret: f };
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (allMatches.length > 1) {
+                        console.log(`    ⚠️ Multiple positions match ${detected.note} @ ${detected.frequency.toFixed(1)}Hz:`);
+                        allMatches.forEach(m => {
+                            const stringName = instrument.strings[numStrings - 1 - m.string];
+                            console.log(`      - String ${m.string+1} (${stringName}) Fret ${m.fret} = ${m.freq.toFixed(1)}Hz (diff: ${m.diff.toFixed(2)}Hz) ${m === bestMatch ? '← CHOSEN' : ''}`);
+                        });
+                    }
+                    
+                    if (bestMatch) {
+                        detectedPositions.add(`${bestMatch.string}-${bestMatch.fret}`);
+                        const stringName = instrument.strings[numStrings - 1 - bestMatch.string]; // Reverse index
+                        console.log(`    ✅ Mapped to: String ${bestMatch.string+1} (${stringName}) Fret ${bestMatch.fret}`);
+                    } else {
+                        console.log(`    ❌ No match found on fretboard`);
+                    }
+                });
+            }
+            
+            console.log(`🎸 Final detected positions: ${Array.from(detectedPositions).join(', ')}`);
+
             
             // Calculate the range needed for this chord
             const hasOpenStrings = frets.some(f => f === 0); // Check for open strings
@@ -1966,15 +2353,46 @@
                     const isChordPosition = frets[s] === f;
                     const fingerNum = isChordPosition ? fingers[s] : 0;
                     
-                    // Check if this string has been played (for color highlighting)
-                    const isDetected = isChordPosition && chordStringsPlayed.includes(s);
+                    // Calculate the note at this position
+                    const noteAtPosition = getNoteAtPosition(s, f);
                     
-                    // Use green if detected, cyan if not yet detected
-                    const positionColor = isDetected ? 'var(--success)' : 'var(--accent-primary)';
-                    const bgColor = isChordPosition ? positionColor : (f === startFret ? 'var(--bg-primary)' : 'transparent');
+                    // Check if the NOTE at this position has been detected (FFT-based)
+                    let isDetected = false;
+                    let isWrongNote = false;
+                    
+                    if (isChordPosition) {
+                        // Check if this EXACT position (string + fret) was physically played
+                        const posKey = `${s}-${f}`;
+                        isDetected = detectedPositions.has(posKey);
+                    }
+                    
+                    // Check if this EXACT position (string + fret) has a diagnosed error
+                    if (!isChordPosition && wrongPositions.length > 0) {
+                        isWrongNote = wrongPositions.some(pos => pos.stringIndex === s && pos.fret === f);
+                    }
+                    
+                    // Color logic
+                    let positionColor, bgColor, glowColor, size;
+                    
+                    if (isWrongNote) {
+                        // Wrong note - show in red
+                        positionColor = 'var(--accent-danger)';
+                        bgColor = 'var(--accent-danger)';
+                        glowColor = 'var(--accent-danger)';
+                        size = '20px';
+                    } else if (isChordPosition) {
+                        // Chord position - green if detected, cyan if not
+                        positionColor = isDetected ? 'var(--success)' : 'var(--accent-primary)';
+                        bgColor = positionColor;
+                        glowColor = isDetected ? 'var(--success)' : 'var(--accent-primary)';
+                        size = '24px';
+                    } else {
+                        // Empty position
+                        bgColor = f === startFret ? 'var(--bg-primary)' : 'transparent';
+                        size = '10px';
+                    }
+                    
                     const borderColor = f === startFret ? 'var(--border)' : 'var(--text-secondary)';
-                    const size = isChordPosition ? '24px' : '10px';
-                    const glowColor = isDetected ? 'var(--success)' : 'var(--accent-primary)';
                     
                     html += `<div style="width: ${cellWidth}px; height: 30px; display: flex; align-items: center; justify-content: center; border-left: ${f === startFret ? '3' : '1'}px solid ${borderColor}; position: relative;">`;
                     
@@ -1987,6 +2405,10 @@
                             // Fingered position - solid circle with number (green if detected)
                             html += `<div style="width: ${size}; height: ${size}; border-radius: 50%; background: ${bgColor}; box-shadow: 0 0 10px ${glowColor}; border: 2px solid var(--bg-primary); display: flex; align-items: center; justify-content: center; color: var(--bg-primary); font-weight: 700; font-size: 0.8rem;">${fingerNum}</div>`;
                         }
+                    }
+                    // Wrong note - show in red with X
+                    else if (isWrongNote) {
+                        html += `<div style="width: ${size}; height: ${size}; border-radius: 50%; background: ${bgColor}; box-shadow: 0 0 10px ${glowColor}; border: 2px solid var(--bg-primary); display: flex; align-items: center; justify-content: center; color: var(--bg-primary); font-weight: 700; font-size: 0.9rem;">✕</div>`;
                     }
                     // Muted string at nut
                     else if (isMuted && f === startFret && startFret === 0) {
@@ -2047,8 +2469,19 @@
                 analyser = audioContext.createAnalyser();
                 microphone = audioContext.createMediaStreamSource(microphoneStream);
                 
-                analyser.fftSize = 4096;
-                microphone.connect(analyser);
+                // Increase FFT size for better frequency resolution
+                analyser.fftSize = 16384; // Increased from 8192 for better bass frequency resolution (2.7 Hz per bin)
+                analyser.smoothingTimeConstant = 0.3; // Add smoothing to stabilize signal (0 = no smoothing, 1 = max smoothing)
+                
+                // Add high-pass filter to remove low-frequency noise
+                const highpass = audioContext.createBiquadFilter();
+                highpass.type = 'highpass';
+                highpass.frequency.value = 40; // Lowered to 40Hz to preserve E2 (82Hz) and D3 (146Hz)
+                highpass.Q.value = 0.7; // Gentler slope to avoid attenuating low guitar frequencies
+                
+                // Connect: microphone → highpass → analyser
+                microphone.connect(highpass);
+                highpass.connect(analyser);
                 
                 isListening = true;
                 statusIndicator.classList.add('active');
@@ -2160,100 +2593,359 @@
                             if (note === currentExercise.notes[0].note) {
                                 detectedNoteEl.className = 'detected-note correct';
                                 
-                                // Auto-advance to next note after a short delay (only once)
-                                if (!hasAutoAdvanced) {
-                                    hasAutoAdvanced = true;
-                                    
-                                    // Increment speed mode score (only once per note)
-                                    incrementSpeedModeScore();
-                                    
-                                    const delayMs = speedModeActive ? 500 : parseFloat(advanceDelayInput.value) * 1000;
-                                    setTimeout(() => {
-                                        if (isListening) { // Only if still listening
-                                            generateExercise();
-                                            hasAutoAdvanced = false; // Reset for next note
-                                        }
-                                    }, delayMs);
-                                }
+                                // Auto-advance DISABLED for debugging
+                                // Use "Suivant" button to manually advance
+                                // if (!hasAutoAdvanced) {
+                                //     hasAutoAdvanced = true;
+                                //     
+                                //     // Increment speed mode score (only once per note)
+                                //     incrementSpeedModeScore();
+                                //     
+                                //     const delayMs = speedModeActive ? 500 : parseFloat(advanceDelayInput.value) * 1000;
+                                //     setTimeout(() => {
+                                //         if (isListening) { // Only if still listening
+                                //             generateExercise();
+                                //             hasAutoAdvanced = false; // Reset for next note
+                                //         }
+                                //     }, delayMs);
+                                // }
                             } else {
                                 detectedNoteEl.className = 'detected-note incorrect';
                                 // Reset hasAutoAdvanced to allow detection to continue
                                 hasAutoAdvanced = false;
                             }
                         } else if (currentExercise && currentExercise.type === 'chord') {
-                            // Chord mode: check if note is part of the chord
+                            // Chord mode: Analyze ONCE after strumming delay
                             const chordNotes = currentExercise.chord.notes;
-                            const stringsToPlay = currentExercise.chord.stringsToPlay;
-                            const frets = currentExercise.chord.frets;
+                            const uniqueChordNotes = [...new Set(chordNotes)];
                             
-                            if (chordNotes.includes(note)) {
-                                // Correct note from the chord
-                                detectedNoteEl.className = 'detected-note correct';
+                            // Quick check: is there any sound?
+                            const fftData = getFFTData();
+                            const maxMagnitude = Math.max(...fftData.dataArray);
+                            const minDb = parseInt(detectionSensitivityInput?.value || -60);
+                            const hasSound = fftData.dataArray.some(magnitude => magnitude > minDb);
+                            
+                            // DEBUG: Log sound detection
+                            if (Date.now() % 1000 < 50) { // Log every ~1 second
+                                console.log(`🔊 Sound check: hasSound=${hasSound}, maxMag=${maxMagnitude.toFixed(1)}dB, chordAnalysisScheduled=${chordAnalysisScheduled}`);
+                            }
+                            
+                            if (!hasSound) {
+                                // No sound - keep results visible, don't reset analysis flag
+                                detectedNoteEl.textContent = '—';
+                                detectedNoteEl.className = 'detected-note';
+                                chordNotesDetected = [];
+                                wrongNotesPlayed = [];
+                                wrongPositions = [];
                                 
-                                // Only increment once per note detection (use hasAutoAdvanced to prevent multiple counts)
-                                if (!hasAutoAdvanced && chordStringsPlayed.length < stringsToPlay) {
-                                    hasAutoAdvanced = true; // Prevent counting again for same note
+                                // DON'T reset chordAnalysisScheduled - block until "Suivant"
+                                // Only reset timer if no analysis done yet
+                                if (!chordAnalysisScheduled) {
+                                    chordDetectionStartTime = 0;
+                                    hasAutoAdvanced = false;
                                     
-                                    // Find the next expected string (from low to high: index 5 → 0)
-                                    // Start from the lowest string (highest index) and go up
-                                    const instrument = instrumentTunings[instrumentType.value];
-                                    let stringFound = false;
+                                    // Only redraw if no analysis done yet (to show initial state)
+                                    if (detectedChordEl) detectedChordEl.style.display = 'none';
                                     
-                                    // Find next string to play (from low to high pitch: index 0 → 5)
-                                    // Index 0 = lowest pitch (E2 grave), Index 5 = highest pitch (E4 aigu)
-                                    let nextStringIndex = -1;
-                                    for (let s = 0; s < frets.length; s++) {
-                                        if (frets[s] !== -1 && !chordStringsPlayed.includes(s)) {
-                                            nextStringIndex = s;
-                                            break;
-                                        }
-                                    }
-                                    
-                                    // Check if the detected note matches the next expected string
-                                    if (nextStringIndex >= 0) {
-                                        const openNote = instrument.notes[nextStringIndex];
-                                        const openNoteIndex = allNotes.indexOf(openNote);
-                                        const stringNoteIndex = (openNoteIndex + frets[nextStringIndex]) % 12;
-                                        const expectedNote = allNotes[stringNoteIndex];
-                                        
-                                        // If this matches the detected note, accept it
-                                        if (expectedNote === note) {
-                                            chordStringsPlayed.push(nextStringIndex);
-                                            chordNotesDetected.push(note);
-                                            stringFound = true;
-                                        }
-                                    }
-                                    
-                                    if (stringFound) {
-                                        // Update progress display in chord notes area
-                                        const progressText = `${chordStringsPlayed.length}/${stringsToPlay} cordes jouées`;
-                                        const notesList = [...new Set(chordNotesDetected)].join(', '); // Show unique notes detected
-                                        chordNotesValue.textContent = `${progressText} (${notesList})`;
-                                        
-                                        // Redraw fretboard if enabled to show updated legend
-                                        if (showFretboardCheckbox.checked) {
-                                            drawChordFretboard(currentExercise.chord);
-                                        }
-                                        
-                                        // Check if all strings have been played
-                                        if (chordStringsPlayed.length >= stringsToPlay) {
-                                            // All strings played, advance to next chord
-                                            const delayMs = parseFloat(advanceDelayInput.value) * 1000;
-                                            setTimeout(() => {
-                                                if (isListening) {
-                                                    generateExercise();
-                                                    hasAutoAdvanced = false;
-                                                }
-                                            }, delayMs);
-                                        }
-                                    } else {
-                                        // Note not in correct order - reset hasAutoAdvanced to allow next note
-                                        hasAutoAdvanced = false;
+                                    if (currentExercise.chord.expectedFrequencies) {
+                                        drawSpectrum(currentExercise.chord.expectedFrequencies, fftData);
                                     }
                                 }
+                                // If analysis done (chordAnalysisScheduled = true), don't redraw anything
+                                // This keeps the frozen spectrum and fretboard visible
                             } else {
-                                // Wrong note
-                                detectedNoteEl.className = 'detected-note incorrect';
+                                // Sound detected
+                                const currentTime = Date.now();
+                                
+                                // Start timer on first sound (only if not already analyzed)
+                                if (chordDetectionStartTime === 0 && !chordAnalysisScheduled) {
+                                    chordDetectionStartTime = currentTime;
+                                    chordNotesValue.textContent = 'Grattez toutes les cordes...';
+                                    console.log(`⏱️ Chord detection started! Waiting ${parseInt(strumDelayInput.value)}ms...`);
+                                }
+                                // Don't overwrite the result message if analysis is done
+                                else if (chordAnalysisScheduled) {
+                                    // Analysis done - don't touch chordNotesValue, it has the result
+                                }
+                                
+                                const timeSinceStart = currentTime - chordDetectionStartTime;
+                                
+                                // Get dynamic strum delay from settings
+                                const chordAnalysisDelay = parseInt(strumDelayInput.value);
+                                
+                                // Perform ONE analysis after strum delay
+                                if (!chordAnalysisScheduled && timeSinceStart >= chordAnalysisDelay) {
+                                    console.log(`🎸 ANALYZING CHORD NOW! (${timeSinceStart}ms elapsed)`);
+                                    chordAnalysisScheduled = true;
+                                    
+                                    // Store FFT data for frozen spectrum display
+                                    frozenFFTData = {
+                                        dataArray: new Float32Array(fftData.dataArray),
+                                        bufferLength: fftData.bufferLength,
+                                        sampleRate: fftData.sampleRate,
+                                        nyquist: fftData.nyquist
+                                    };
+                                    
+                                    // ===== SINGLE FFT ANALYSIS =====
+                                    const detectedNotes = detectChordFromFFT(fftData);
+                                    const foundNotes = uniqueChordNotes.filter(note => detectedNotes.includes(note));
+                                    
+                                    console.log(`🎵 Chord Analysis:`);
+                                    console.log(`  Expected notes: ${uniqueChordNotes.join(', ')}`);
+                                    console.log(`  Detected notes: ${detectedNotes.join(', ')}`);
+                                    console.log(`  Found notes (intersection): ${foundNotes.join(', ')}`);
+
+                                    
+                                    // Check if bass note (lowest expected frequency) is detected at the RIGHT FREQUENCY
+                                    globalBassNoteMissing = false;
+                                    globalMissingBassNote = null;
+                                    
+                                    if (currentExercise.chord.expectedFrequencies && currentExercise.chord.expectedFrequencies.length > 0 && window.lastDetectedNotesWithFreq) {
+                                        // Find the lowest expected frequency (bass note)
+                                        const sortedExpected = [...currentExercise.chord.expectedFrequencies].sort((a, b) => a.frequency - b.frequency);
+                                        const bassFreq = sortedExpected[0];
+                                        
+                                        // Check if this bass note is detected at approximately the right frequency
+                                        const bassDetected = window.lastDetectedNotesWithFreq.some(detected => {
+                                            // Must be same note name
+                                            if (detected.note !== bassFreq.note) return false;
+                                            
+                                            // Must be within ±10% of expected frequency (allows some tuning variance but not octaves)
+                                            const freqRatio = detected.frequency / bassFreq.frequency;
+                                            return freqRatio >= 0.9 && freqRatio <= 1.1;
+                                        });
+                                        
+                                        if (!bassDetected) {
+                                            globalBassNoteMissing = true;
+                                            globalMissingBassNote = bassFreq.note;
+                                            console.log(`⚠️ Bass note missing: ${bassFreq.note} at ${Math.round(bassFreq.frequency)}Hz`);
+                                            
+                                            // IMPORTANT: Remove bass note from foundNotes if detected at wrong octave
+                                            // This ensures proper message display
+                                            const bassNoteIndex = foundNotes.indexOf(bassFreq.note);
+                                            if (bassNoteIndex !== -1) {
+                                                foundNotes.splice(bassNoteIndex, 1);
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Chord is complete only if all notes found AND bass note present at right frequency
+                                    const chordComplete = foundNotes.length >= uniqueChordNotes.length && !globalBassNoteMissing;
+                                    
+                                    if (detectedNotes.length > 0) {
+                                        const sortedDetectedNotes = sortNotesByPitch(detectedNotes);
+                                        const sortedFoundNotes = sortNotesByPitch(foundNotes);
+                                        
+                                        // Identify wrong notes
+                                        wrongNotesPlayed = sortedDetectedNotes.filter(note => !uniqueChordNotes.includes(note));
+                                        
+                                        // Identify chord played
+                                        const identifiedChord = identifyChord(sortedDetectedNotes);
+                                        
+                                        // Analyze finger errors
+                                        const misplacedFingers = [];
+                                        wrongPositions = [];
+                                        
+                                        if (wrongNotesPlayed.length > 0 || sortedFoundNotes.length < uniqueChordNotes.length) {
+                                            const instrument = instrumentTunings[instrumentType.value];
+                                            const expectedFrets = currentExercise.chord.frets;
+                                            const missingNotes = uniqueChordNotes.filter(n => !sortedFoundNotes.includes(n));
+                                            
+                                            if (missingNotes.length > 0) {
+                                                missingNotes.forEach(missingNote => {
+                                                    for (let s = 0; s < expectedFrets.length; s++) {
+                                                        if (expectedFrets[s] === -1) continue;
+                                                        
+                                                        const openNote = instrument.notes[s];
+                                                        const openNoteIndex = allNotes.indexOf(openNote);
+                                                        const expectedNoteIndex = (openNoteIndex + expectedFrets[s]) % 12;
+                                                        const expectedNote = allNotes[expectedNoteIndex];
+                                                        
+                                                        if (expectedNote === missingNote) {
+                                                            const openStringNote = allNotes[openNoteIndex];
+                                                            let detectedOnThisString = null;
+                                                            
+                                                            if (sortedDetectedNotes.includes(openStringNote) && openStringNote !== expectedNote) {
+                                                                detectedOnThisString = { fret: 0, note: openStringNote };
+                                                            } else {
+                                                                for (let fret = 1; fret <= 12; fret++) {
+                                                                    const noteIndex = (openNoteIndex + fret) % 12;
+                                                                    const noteAtFret = allNotes[noteIndex];
+                                                                    if (sortedDetectedNotes.includes(noteAtFret) && noteAtFret !== expectedNote) {
+                                                                        detectedOnThisString = { fret: fret, note: noteAtFret };
+                                                                        break;
+                                                                    }
+                                                                }
+                                                            }
+                                                            
+                                                            if (detectedOnThisString) {
+                                                                const fingerNum = currentExercise.chord.fingers[s];
+                                                                const stringName = instrument.strings[s];
+                                                                const errorType = (detectedOnThisString.fret === 0 && expectedFrets[s] > 0) ? 'missing_finger' : 'wrong_fret';
+                                                                
+                                                                misplacedFingers.push({
+                                                                    string: stringName,
+                                                                    stringIndex: s,
+                                                                    expectedFret: expectedFrets[s],
+                                                                    expectedNote: expectedNote,
+                                                                    detectedFret: detectedOnThisString.fret,
+                                                                    detectedNote: detectedOnThisString.note,
+                                                                    finger: fingerNum,
+                                                                    type: errorType
+                                                                });
+                                                                
+                                                                wrongPositions.push({
+                                                                    stringIndex: s,
+                                                                    fret: detectedOnThisString.fret
+                                                                });
+                                                            }
+                                                            break;
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        }
+                                        
+                                        // Display results
+                                        if (chordComplete) {
+                                            // Correct chord
+                                            detectedNoteEl.className = 'detected-note correct';
+                                            chordNotesDetected = sortedFoundNotes;
+                                            chordNotesValue.textContent = `✅ Accord complet !`;
+                                            
+                                            if (detectedChordEl) detectedChordEl.style.display = 'none';
+                                            
+                                            // Always draw fretboard after analysis to keep it visible
+                                            drawChordFretboard(currentExercise.chord);
+                                            
+                                            if (currentExercise.chord.expectedFrequencies) {
+                                                drawSpectrum(currentExercise.chord.expectedFrequencies, frozenFFTData || fftData);
+                                            }
+                                            
+                                            // Auto-advance DISABLED for debugging
+                                            // Use "Suivant" button to manually advance
+                                            // if (!hasAutoAdvanced) {
+                                            //     hasAutoAdvanced = true;
+                                            //     const delayMs = parseFloat(advanceDelayInput.value) * 1000;
+                                            //     setTimeout(() => {
+                                            //         if (isListening) {
+                                            //             generateExercise();
+                                            //             hasAutoAdvanced = false;
+                                            //         }
+                                            //     }, delayMs);
+                                            // }
+                                        } else {
+                                            // Wrong or partial chord
+                                            detectedNoteEl.className = 'detected-note';
+                                            chordNotesDetected = sortedFoundNotes;
+                                            
+                                            // Show detected chord in red
+                                            if (identifiedChord && detectedChordEl && sortedDetectedNotes.length >= 2) {
+                                                detectedChordEl.textContent = identifiedChord;
+                                                detectedChordEl.style.display = 'block';
+                                            } else {
+                                                if (detectedChordEl) detectedChordEl.style.display = 'none';
+                                            }
+                                            
+                                            // Show appropriate message
+                                            console.log(`🔧 Message logic: globalBassNoteMissing=${globalBassNoteMissing}, detectedLength=${sortedDetectedNotes.length}, foundLength=${sortedFoundNotes.length}, uniqueLength=${uniqueChordNotes.length}, wrongNotes=${wrongNotesPlayed.join(',')}`);
+                                            console.log(`🔧 About to check: typeof globalBassNoteMissing=${typeof globalBassNoteMissing}, value=${globalBassNoteMissing}, truthiness=${!!globalBassNoteMissing}`);
+                                            
+                                            if (globalBassNoteMissing) {
+                                                console.log(`  → Entering BASS MISSING branch`);
+                                                console.log(`  → globalMissingBassNote = "${globalMissingBassNote}"`);
+                                                // CRITICAL: Bass note missing - chord INCORRECT
+                                                let message = `❌ Accord incorrect - Basse manquante: ${globalMissingBassNote}`;
+                                                
+                                                // Also show other missing notes if any
+                                                const otherMissingNotes = uniqueChordNotes.filter(n => 
+                                                    !sortedFoundNotes.includes(n) && n !== globalMissingBassNote
+                                                );
+                                                if (otherMissingNotes.length > 0) {
+                                                    message += ` (aussi: ${otherMissingNotes.join(', ')})`;
+                                                }
+                                                
+                                                // Show wrong notes if any
+                                                if (wrongNotesPlayed.length > 0) {
+                                                    message += ` ⚠️ Parasites: ${wrongNotesPlayed.join(', ')}`;
+                                                }
+                                                
+                                                // Make sure the chord notes display is visible
+                                                const chordNotesDisplay = document.getElementById('chordNotesDisplay');
+                                                console.log(`🔧 chordNotesDisplay:`, chordNotesDisplay, `display before:`, chordNotesDisplay?.style?.display);
+                                                if (chordNotesDisplay) {
+                                                    chordNotesDisplay.style.display = 'block';
+                                                    console.log(`🔧 Set to block! display after:`, chordNotesDisplay.style.display);
+                                                }
+                                                
+                                                chordNotesValue.textContent = message;
+                                            } else if (sortedDetectedNotes.length >= 3 && sortedFoundNotes.length < uniqueChordNotes.length) {
+                                                // Other notes missing (not bass) - WARNING
+                                                let message = `⚠️ Notes aiguës manquantes: ${uniqueChordNotes.filter(n => !sortedFoundNotes.includes(n)).join(', ')}`;
+                                                
+                                                // Show wrong notes if any
+                                                if (wrongNotesPlayed.length > 0) {
+                                                    message += ` ⚠️ Parasites: ${wrongNotesPlayed.join(', ')}`;
+                                                }
+                                                
+                                                chordNotesValue.textContent = message;
+                                            } else if (sortedDetectedNotes.length >= 3 && wrongNotesPlayed.length > 0) {
+                                                // All expected notes found but with parasites
+                                                let message = `❌ Accord incorrect`;
+                                                
+                                                // Show wrong notes
+                                                message += ` - Notes parasites: ${wrongNotesPlayed.join(', ')}`;
+                                                
+                                                chordNotesValue.textContent = message;
+                                            } else {
+                                                const missingNotes = uniqueChordNotes.filter(n => !sortedFoundNotes.includes(n));
+                                                const sortedMissingNotes = sortNotesByPitch(missingNotes);
+                                                
+                                                let message = '';
+                                                if (sortedMissingNotes.length > 0) {
+                                                    message = `Manquantes: ${sortedMissingNotes.join(', ')}`;
+                                                } else {
+                                                    message = `${sortedFoundNotes.length}/${uniqueChordNotes.length} notes`;
+                                                }
+                                                
+                                                // Add wrong notes warning if present
+                                                if (wrongNotesPlayed.length > 0) {
+                                                    message += ` ⚠️ Parasites: ${wrongNotesPlayed.join(', ')}`;
+                                                }
+                                                
+                                                chordNotesValue.textContent = message;
+                                            }
+                                            
+                                            // Always draw fretboard after analysis to keep it visible
+                                            drawChordFretboard(currentExercise.chord);
+                                            
+                                            if (currentExercise.chord.expectedFrequencies) {
+                                                drawSpectrum(currentExercise.chord.expectedFrequencies, frozenFFTData || fftData);
+                                            }
+                                        }
+                                    }
+                                } else if (chordAnalysisScheduled && timeSinceStart >= chordTimeout) {
+                                    // Timeout - reset
+                                    detectedNoteEl.textContent = '—';
+                                    detectedNoteEl.className = 'detected-note';
+                                    chordNotesDetected = [];
+                                    wrongNotesPlayed = [];
+                                    wrongPositions = [];
+                                    chordDetectionStartTime = 0;
+                                    // DON'T reset chordAnalysisScheduled - stay blocked until "Suivant"
+                                    // chordAnalysisScheduled = false;
+                                    
+                                    chordNotesValue.innerHTML = `<span style="color: var(--accent-danger); font-weight: 700; font-size: 1.1rem;">⏱️ Temps écoulé - Réessayez l'accord ${currentExercise.chord.displayName}</span>`;
+                                    
+                                    if (detectedChordEl) detectedChordEl.style.display = 'none';
+                                    
+                                    // Always draw fretboard to keep it visible
+                                    drawChordFretboard(currentExercise.chord);
+                                    
+                                    if (currentExercise.chord.expectedFrequencies) {
+                                        drawSpectrum(currentExercise.chord.expectedFrequencies, frozenFFTData || fftData);
+                                    }
+                                }
                             }
                         } else {
                             detectedNoteEl.className = 'detected-note';
@@ -2273,6 +2965,333 @@
             requestAnimationFrame(detectPitch);
         }
 
+        function identifyChord(notes) {
+            if (notes.length < 2) return null;
+            
+            // Sort notes to normalize
+            const sortedNotes = sortNotesByPitch(notes);
+            const noteSet = sortedNotes.join(',');
+            
+            // Common chord patterns (normalized to root position when possible)
+            const chordDatabase = {
+                // Major chords
+                'C,E,G': 'C',
+                'C#,F,G#': 'C#',
+                'D,F#,A': 'D',
+                'D#,G,A#': 'D#',
+                'E,G#,B': 'E',
+                'F,A,C': 'F',
+                'F#,A#,C#': 'F#',
+                'G,B,D': 'G',
+                'G#,C,D#': 'G#',
+                'A,C#,E': 'A',
+                'A#,D,F': 'A#',
+                'B,D#,F#': 'B',
+                
+                // Minor chords
+                'C,D#,G': 'Cm',
+                'C#,E,G#': 'C#m',
+                'D,F,A': 'Dm',
+                'D#,F#,A#': 'D#m',
+                'E,G,B': 'Em',
+                'F,G#,C': 'Fm',
+                'F#,A,C#': 'F#m',
+                'G,A#,D': 'Gm',
+                'G#,B,D#': 'G#m',
+                'A,C,E': 'Am',
+                'A#,C#,F': 'A#m',
+                'B,D,F#': 'Bm',
+                
+                // 7th chords (partial matches)
+                'C,E,G,A#': 'C7',
+                'D,F#,A,C': 'D7',
+                'E,G#,B,D': 'E7',
+                'F,A,C,D#': 'F7',
+                'G,B,D,F': 'G7',
+                'A,C#,E,G': 'A7',
+                'B,D#,F#,A': 'B7',
+                
+                // Power chords (2 notes)
+                'C,G': 'C5',
+                'D,A': 'D5',
+                'E,B': 'E5',
+                'F,C': 'F5',
+                'G,D': 'G5',
+                'A,E': 'A5',
+                
+                // Suspended chords
+                'C,F,G': 'Csus4',
+                'D,G,A': 'Dsus4',
+                'E,A,B': 'Esus4',
+                'G,C,D': 'Gsus4',
+                'A,D,E': 'Asus4'
+            };
+            
+            // Check direct match
+            if (chordDatabase[noteSet]) {
+                return chordDatabase[noteSet];
+            }
+            
+            // Check if it's an inversion (try all rotations)
+            for (let i = 0; i < sortedNotes.length; i++) {
+                const rotated = [...sortedNotes.slice(i), ...sortedNotes.slice(0, i)];
+                const rotatedSet = rotated.join(',');
+                if (chordDatabase[rotatedSet]) {
+                    return chordDatabase[rotatedSet] + ' (inversion)';
+                }
+            }
+            
+            // If not found, return notes
+            return sortedNotes.join('-');
+        }
+
+        function sortNotesByPitch(notes) {
+            // Define note order (C is lowest in each octave)
+            const noteOrder = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            
+            // Convert notes to frequencies for sorting
+            const notesWithFreq = notes.map(note => {
+                const freq = noteToFrequency(note);
+                return { note: note, frequency: freq };
+            });
+            
+            // Sort by frequency (lowest first)
+            notesWithFreq.sort((a, b) => a.frequency - b.frequency);
+            
+            // Return just the note names
+            return notesWithFreq.map(n => n.note);
+        }
+
+        function getFFTData() {
+            // Single FFT call - returns data to be reused
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Float32Array(bufferLength);
+            analyser.getFloatFrequencyData(dataArray);
+            const sampleRate = audioContext.sampleRate;
+            const nyquist = sampleRate / 2;
+            
+            // Debug: Log FFT statistics occasionally
+            if (Date.now() % 2000 < 50) { // Every ~2 seconds
+                const validData = dataArray.filter(v => v > -100);
+                if (validData.length > 0) {
+                    const maxMag = Math.max(...validData);
+                    const avgMag = validData.reduce((a, b) => a + b, 0) / validData.length;
+                    console.log(`📊 FFT Stats: max=${maxMag.toFixed(1)}dB, avg=${avgMag.toFixed(1)}dB, bins=${bufferLength}`);
+                }
+            }
+            
+            return {
+                dataArray,
+                bufferLength,
+                sampleRate,
+                nyquist
+            };
+        }
+
+        function detectChordFromFFT(fftData) {
+            // Use pre-computed FFT data
+            const { dataArray, bufferLength, nyquist } = fftData;
+            
+            // Find all peaks in the frequency spectrum
+            const peaks = [];
+            // Get dynamic sensitivity from user settings
+            const minDb = parseInt(detectionSensitivityInput?.value || -60);
+            const peakThreshold = 5; // Base threshold for peak detection
+            
+            for (let i = 2; i < bufferLength - 2; i++) {
+                if (dataArray[i] > minDb) {
+                    const frequency = (i * nyquist) / bufferLength;
+                    
+                    // Dynamic peak threshold: lower for D string range (more sensitive)
+                    let dynamicPeakThreshold = peakThreshold;
+                    if (frequency >= 140 && frequency <= 155) {
+                        dynamicPeakThreshold = 3; // More sensitive in D range
+                    }
+                    
+                    // Check if this is a local maximum
+                    if (dataArray[i] > dataArray[i-1] && 
+                        dataArray[i] > dataArray[i-2] &&
+                        dataArray[i] > dataArray[i+1] && 
+                        dataArray[i] > dataArray[i+2]) {
+                        
+                        // Check if peak is strong enough
+                        const avgNeighbors = (dataArray[i-2] + dataArray[i-1] + dataArray[i+1] + dataArray[i+2]) / 4;
+                        if (dataArray[i] - avgNeighbors > dynamicPeakThreshold) {
+                            
+                            // Only consider frequencies in musical range (40Hz - 1000Hz)
+                            // Lowered to 40Hz to better capture low E string and D string
+                            if (frequency >= 40 && frequency <= 1000) {
+                                peaks.push({
+                                    frequency: frequency,
+                                    magnitude: dataArray[i]
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Sort peaks by frequency (lowest first)
+            peaks.sort((a, b) => a.frequency - b.frequency);
+            
+            // Find maximum magnitude for relative filtering
+            const maxMagnitude = Math.max(...peaks.map(p => p.magnitude));
+            const magnitudeThreshold = 18; // dB - increased to 18 for better harmonic filtering with louder playing
+            
+            // BOOST LOW FREQUENCIES: Add virtual magnitude boost to favor fundamentals over harmonics
+            // This helps when harmonics are stronger than the fundamental (common with D string)
+            peaks.forEach(peak => {
+                // Apply frequency-dependent boost: stronger for lower frequencies
+                if (peak.frequency < 200) {
+                    // Low frequencies (E2, A2, D3, G3) get +6dB boost
+                    peak.boostedMagnitude = peak.magnitude + 6;
+                } else if (peak.frequency < 300) {
+                    // Mid-low frequencies get +3dB boost
+                    peak.boostedMagnitude = peak.magnitude + 3;
+                } else {
+                    // Higher frequencies get no boost
+                    peak.boostedMagnitude = peak.magnitude;
+                }
+            });
+            
+            const maxBoostedMagnitude = Math.max(...peaks.map(p => p.boostedMagnitude));
+            
+            console.log(`🔊 Max magnitude: ${maxMagnitude.toFixed(1)}dB, Max boosted: ${maxBoostedMagnitude.toFixed(1)}dB`);
+            
+            // Debug: Log all peaks found
+            if (peaks.length > 0) {
+                console.log(`🔍 All peaks found: ${peaks.map(p => `${Math.round(p.frequency)}Hz (${p.magnitude.toFixed(1)}dB)`).join(', ')}`);
+                
+                // Special debug for D string detection (146.83 Hz) and its octave (293.66 Hz)
+                const dPeaks = peaks.filter(p => p.frequency >= 140 && p.frequency <= 155);
+                const dOctavePeaks = peaks.filter(p => p.frequency >= 285 && p.frequency <= 302);
+                
+                if (dPeaks.length > 0) {
+                    console.log(`🎯 D3 range (140-155Hz): ${dPeaks.map(p => `${Math.round(p.frequency)}Hz (${p.magnitude.toFixed(1)}dB, boosted: ${p.boostedMagnitude.toFixed(1)}dB)`).join(', ')}`);
+                }
+                if (dOctavePeaks.length > 0) {
+                    console.log(`🎯 D4 octave range (285-302Hz): ${dOctavePeaks.map(p => `${Math.round(p.frequency)}Hz (${p.magnitude.toFixed(1)}dB, boosted: ${p.boostedMagnitude.toFixed(1)}dB)`).join(', ')}`);
+                }
+                
+                // Check if D4 is stronger than D3 (problematic case)
+                if (dPeaks.length > 0 && dOctavePeaks.length > 0) {
+                    const d3Mag = dPeaks[0].magnitude;
+                    const d4Mag = dOctavePeaks[0].magnitude;
+                    const diff = d4Mag - d3Mag;
+                    if (diff > 5) {
+                        console.log(`⚠️ WARNING: D4 octave is ${diff.toFixed(1)}dB stronger than D3 fundamental! This may cause detection issues.`);
+                    }
+                }
+            }
+            
+            // Filter out harmonics BUT KEEP OCTAVES: keep fundamentals + octaves
+            const fundamentals = [];
+            const harmonicTolerance = 0.015; // 1.5% tolerance - slightly relaxed for better D string detection
+            
+            for (let i = 0; i < peaks.length; i++) {
+                const peak = peaks[i];
+                let isHarmonic = false;
+                let harmonicOf = null;
+                
+                // Check if this peak is a harmonic of any lower frequency peak
+                for (let j = 0; j < fundamentals.length; j++) {
+                    const fundamental = fundamentals[j];
+                    
+                    // Check harmonics 3x-10x (NOT 2x = octave)
+                    for (let multiple = 3; multiple <= 10; multiple++) {
+                        const expectedHarmonic = fundamental.frequency * multiple;
+                        const diff = Math.abs(peak.frequency - expectedHarmonic) / expectedHarmonic;
+                        
+                        if (diff < harmonicTolerance) {
+                            isHarmonic = true;
+                            harmonicOf = { freq: fundamental.frequency, multiple: multiple };
+                            break;
+                        }
+                    }
+                    
+                    if (isHarmonic) break;
+                }
+                
+                // MAGNITUDE FILTER: If harmonic AND weak, filter it
+                if (isHarmonic && harmonicOf) {
+                    // Use BOOSTED magnitude to better detect when harmonics are stronger than fundamentals
+                    const magnitudeDiff = maxBoostedMagnitude - peak.boostedMagnitude;
+                    
+                    if (magnitudeDiff > magnitudeThreshold) {
+                        // Weak harmonic - filter it
+                        console.log(`  ❌ ${Math.round(peak.frequency)}Hz filtered (weak harmonic ${harmonicOf.multiple}x of ${Math.round(harmonicOf.freq)}Hz, ${magnitudeDiff.toFixed(1)}dB below max boosted)`);
+                        continue; // Skip this peak
+                    } else {
+                        // Strong harmonic - might be a real note, keep it
+                        console.log(`  ⚠️ ${Math.round(peak.frequency)}Hz kept despite being harmonic ${harmonicOf.multiple}x (strong: only ${magnitudeDiff.toFixed(1)}dB below max boosted)`);
+                    }
+                }
+                
+                // Add if it's fundamental OR octave OR strong harmonic
+                if (!isHarmonic || (isHarmonic && (maxBoostedMagnitude - peak.boostedMagnitude) <= magnitudeThreshold)) {
+                    fundamentals.push(peak);
+                    
+                    // Check if this is an octave of a lower fundamental
+                    let isOctave = false;
+                    let octaveOfFundamental = null;
+                    for (let j = 0; j < fundamentals.length - 1; j++) {
+                        const lower = fundamentals[j];
+                        const expectedOctave = lower.frequency * 2;
+                        const diff = Math.abs(peak.frequency - expectedOctave) / expectedOctave;
+                        if (diff < harmonicTolerance) {
+                            isOctave = true;
+                            octaveOfFundamental = lower;
+                            
+                            // SPECIAL CHECK: If octave is MUCH stronger than fundamental, it might be the real note
+                            const octaveStronger = peak.magnitude - lower.magnitude;
+                            if (octaveStronger > 10) {
+                                console.log(`  ⚠️ OCTAVE DOMINANCE: ${Math.round(peak.frequency)}Hz is ${octaveStronger.toFixed(1)}dB stronger than fundamental ${Math.round(lower.frequency)}Hz - might be primary note!`);
+                            } else {
+                                console.log(`  ✅ ${Math.round(peak.frequency)}Hz kept (octave of ${Math.round(lower.frequency)}Hz, +${octaveStronger.toFixed(1)}dB)`);
+                            }
+                            break;
+                        }
+                    }
+                    
+                    if (!isOctave) {
+                        console.log(`  ✅ ${Math.round(peak.frequency)}Hz kept (fundamental, ${peak.magnitude.toFixed(1)}dB, boosted: ${peak.boostedMagnitude.toFixed(1)}dB)`);
+                    }
+                }
+            }
+            
+            // Convert frequencies to notes
+            const detectedNotes = fundamentals.map(peak => {
+                const note = frequencyToNote(peak.frequency);
+                return { note: note, frequency: peak.frequency, magnitude: peak.magnitude };
+            }).filter(n => n.note !== null);
+            
+            // Debug: Log frequency to note conversion
+            if (detectedNotes.length > 0) {
+                console.log(`🎵 Fundamentals → Notes: ${detectedNotes.map(n => `${n.note} (${Math.round(n.frequency)}Hz)`).join(', ')}`);
+            }
+            
+            // Remove duplicate notes (keep highest magnitude)
+            const uniqueNotes = {};
+            detectedNotes.forEach(n => {
+                if (!uniqueNotes[n.note] || uniqueNotes[n.note].magnitude < n.magnitude) {
+                    uniqueNotes[n.note] = n;
+                }
+            });
+            
+            const finalNotes = Object.keys(uniqueNotes);
+            
+            // Debug: Log final result
+            if (finalNotes.length > 0) {
+                console.log(`✨ Final detected notes: ${finalNotes.join(', ')}`);
+            }
+            console.log('---');
+            
+            // Store detected notes with frequencies globally for spectrum display
+            window.lastDetectedNotesWithFreq = detectedNotes;
+            
+            return finalNotes;
+        }
+
         function autoCorrelate(buffer, sampleRate) {
             let size = buffer.length;
             let maxSamples = Math.floor(size / 2);
@@ -2280,15 +3299,20 @@
             let bestCorrelation = 0;
             let rms = 0;
             
+            // Calculate RMS (signal strength)
             for (let i = 0; i < size; i++) {
                 let val = buffer[i];
                 rms += val * val;
             }
             rms = Math.sqrt(rms / size);
             
-            if (rms < 0.01) return -1;
+            // Higher threshold to avoid weak signals and false positives
+            if (rms < 0.03) return -1; // Increased from 0.02 to reduce false positives
             
+            // Store all good correlations to find the strongest
+            let correlations = [];
             let lastCorrelation = 1;
+            
             for (let offset = 1; offset < maxSamples; offset++) {
                 let correlation = 0;
                 for (let i = 0; i < maxSamples; i++) {
@@ -2296,15 +3320,66 @@
                 }
                 correlation = 1 - (correlation / maxSamples);
                 
-                if (correlation > 0.9 && correlation > lastCorrelation) {
-                    let foundGoodCorrelation = false;
-                    if (correlation > bestCorrelation) {
-                        bestCorrelation = correlation;
-                        bestOffset = offset;
-                        foundGoodCorrelation = true;
+                // Stricter threshold to avoid false detections
+                if (correlation > 0.90 && correlation > lastCorrelation) { // Increased from 0.85 to 0.90
+                    // Check if this is a local maximum
+                    let isPeak = true;
+                    for (let j = 1; j <= 3 && offset + j < maxSamples; j++) {
+                        let futureCorr = 0;
+                        for (let i = 0; i < maxSamples; i++) {
+                            futureCorr += Math.abs(buffer[i] - buffer[i + offset + j]);
+                        }
+                        futureCorr = 1 - (futureCorr / maxSamples);
+                        if (futureCorr > correlation) {
+                            isPeak = false;
+                            break;
+                        }
+                    }
+                    
+                    if (isPeak) {
+                        correlations.push({
+                            offset: offset,
+                            correlation: correlation,
+                            frequency: sampleRate / offset
+                        });
                     }
                 }
                 lastCorrelation = correlation;
+            }
+            
+            if (correlations.length === 0) return -1;
+            
+            // Sort by correlation strength (highest first)
+            correlations.sort((a, b) => b.correlation - a.correlation);
+            
+            // Only accept if correlation is strong enough
+            if (correlations[0].correlation < 0.92) return -1; // Add minimum quality threshold
+            
+            // Take the strongest correlation (most recent/loudest note)
+            bestOffset = correlations[0].offset;
+            bestCorrelation = correlations[0].correlation;
+            
+            // Parabolic interpolation for sub-sample accuracy
+            if (bestOffset > 1 && bestOffset < maxSamples - 1) {
+                let y1 = 0, y2 = 0, y3 = 0;
+                
+                // Recalculate correlation for neighboring offsets
+                for (let i = 0; i < maxSamples; i++) {
+                    y1 += Math.abs(buffer[i] - buffer[i + bestOffset - 1]);
+                    y2 += Math.abs(buffer[i] - buffer[i + bestOffset]);
+                    y3 += Math.abs(buffer[i] - buffer[i + bestOffset + 1]);
+                }
+                y1 = 1 - (y1 / maxSamples);
+                y2 = 1 - (y2 / maxSamples);
+                y3 = 1 - (y3 / maxSamples);
+                
+                let a = (y1 + y3) / 2 - y2;
+                let b = (y3 - y1) / 2;
+                
+                if (a !== 0) {
+                    let refinedOffset = bestOffset - b / (2 * a);
+                    return sampleRate / refinedOffset;
+                }
             }
             
             if (bestCorrelation > 0.01) {
@@ -2516,6 +3591,13 @@
             // Just update the state, will be used when playing notes
             playNoteSound = playSoundCheckbox.checked;
         });
+
+        // Update sensitivity value display
+        if (detectionSensitivityInput) {
+            detectionSensitivityInput.addEventListener('input', () => {
+                sensitivityValueDisplay.textContent = `${detectionSensitivityInput.value} dB`;
+            });
+        }
 
         // Sync speed mode duration display when input changes
         speedModeDurationInput.addEventListener('change', () => {
@@ -2859,6 +3941,15 @@
         // Initialize
         initializeEnabledStrings();
         generateExercise();
+        
+        // Show fretboard and instrument selection by default (since checkbox is checked)
+        if (showFretboardCheckbox.checked) {
+            instrumentSelection.style.display = 'block';
+            fretCountSelection.style.display = 'block';
+            if (currentExercise && currentExercise.type === 'chord') {
+                drawChordFretboard(currentExercise.chord);
+            }
+        }
         
         // Display version number
         document.getElementById('appVersion').textContent = APP_VERSION;
