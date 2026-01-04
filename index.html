@@ -713,6 +713,12 @@
                     <button class="mode-btn" data-mode="chords">
                         🎼 Accords
                     </button>
+                    <button class="mode-btn" data-mode="debug">
+                        🔬 Debug FFT
+                    </button>
+                    <button class="mode-btn" data-mode="tuner">
+                        🎵 Accordeur
+                    </button>
                 </div>
 
                 <!-- 2. Niveau de difficulté -->
@@ -769,7 +775,43 @@
                     </div>
                 </div>
 
+                <!-- 3c. Mode Debug FFT (conditionnel) -->
+                <div id="debugModeSettings" style="display: none;">
+                    <div class="section-title">Mode Debug FFT</div>
+                    <div class="setting-group">
+                        <label class="setting-label">Temps d'écoute (ms)</label>
+                        <input type="number" id="debugCaptureDelay" min="200" max="2000" step="100" value="600">
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                            Délai avant de figer le spectre après détection du signal
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <label class="setting-label">Durée de capture FFT (ms)</label>
+                        <select id="debugBufferDuration" style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 2px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'DM Sans', sans-serif; font-size: 0.9rem;">
+                            <option value="93">93 ms (4096 samples)</option>
+                            <option value="186">186 ms (8192 samples)</option>
+                            <option value="371">371 ms (16384 samples)</option>
+                            <option value="743">743 ms (32768 samples)</option>
+                            <option value="1486" selected>1486 ms (65536 samples)</option>
+                        </select>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                            Durée du signal capturé pour l'analyse FFT<br>
+                            <span style="color: var(--accent-warning);">Plus long = meilleure résolution fréquentielle</span>
+                        </div>
+                    </div>
+                    <div style="margin-top: 0.5rem; padding: 0.75rem; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border);">
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">ℹ️ Mode d'emploi</div>
+                        <div style="font-size: 0.7rem; color: var(--text-secondary); line-height: 1.4;">
+                            1. Jouez une note/accord<br>
+                            2. Le spectre se fige automatiquement<br>
+                            3. Analysez les fréquences brutes<br>
+                            4. Cliquez Reset pour recommencer
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 4. Visualisation manche -->
+                <div id="fretboardVisualizationSection">
                 <div class="section-title">Visualisation manche</div>
                 <div class="setting-group">
                     <label class="checkbox-label">
@@ -794,6 +836,7 @@
                         <option value="24">24 frettes</option>
                     </select>
                 </div>
+                </div>
 
                 <!-- 5. Détection audio -->
                 <div class="section-title">Détection audio</div>
@@ -805,9 +848,10 @@
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">Temps de grattage (ms)</label>
-                    <input type="number" id="strumDelay" min="200" max="1000" step="50" value="600">
+                    <input type="number" id="strumDelay" min="200" max="1500" step="50" value="600">
                     <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                        Délai avant analyse de l'accord (200-1000ms)
+                        Délai avant analyse de l'accord (200-1500ms)<br>
+                        <span style="color: var(--accent-warning);">Augmentez si grattage rapide détecte trop de notes</span>
                     </div>
                 </div>
                 <div class="setting-group">
@@ -820,6 +864,20 @@
                     </div>
                     <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
                         Seuil minimum de détection du signal
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">Nombre max de notes détectées</label>
+                    <select id="maxNotesDetected" style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 2px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'DM Sans', sans-serif; font-size: 0.9rem;">
+                        <option value="0">Illimité (toutes les notes)</option>
+                        <option value="3" selected>3 notes les plus fortes</option>
+                        <option value="4">4 notes les plus fortes</option>
+                        <option value="5">5 notes les plus fortes</option>
+                        <option value="6">6 notes (toutes les cordes)</option>
+                    </select>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                        Limite le nombre de notes pour ignorer les cordes sympathiques<br>
+                        <span style="color: var(--accent-warning);">Utile si grattage rapide détecte trop de notes</span>
                     </div>
                 </div>
                 <div class="setting-group">
@@ -903,6 +961,206 @@
                             <canvas id="spectrumCanvas" width="800" height="200" style="width: 100%; max-width: 800px; height: auto; background: var(--bg-tertiary); border-radius: 8px; border: 2px solid var(--border); display: block; margin: 0 auto;"></canvas>
                             <div style="margin-top: 0.5rem; text-align: center; font-size: 0.7rem; color: var(--text-secondary); font-style: italic;">
                                 🟢 Vert = Fréquences attendues | 🔵 Cyan = Spectre complet
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Debug FFT mode display (hidden by default) -->
+                    <div id="debugModeDisplay" style="display: none;">
+                        <div style="text-align: center; margin-bottom: 1rem;">
+                            <div style="font-size: 1.2rem; color: var(--accent-primary); margin-bottom: 0.5rem;">🔬 Analyse FFT Brute</div>
+                            <div id="debugStatus" style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                                🎤 En attente d'un signal...
+                            </div>
+                            <!-- Reset button in main interface -->
+                            <button id="debugResetBtn" class="btn" style="background: var(--accent-danger); color: white; padding: 0.5rem 1.5rem; font-size: 0.9rem;">
+                                🔄 Reset et réinitialiser l'écoute
+                            </button>
+                        </div>
+                        
+                        <!-- Raw Waveform (Time Domain) -->
+                        <div style="margin-top: 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <div style="display: flex; gap: 1rem; align-items: center;">
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em;">Signal Temporel Brut</div>
+                                    <label class="checkbox-label" style="margin: 0;">
+                                        <input type="checkbox" id="useZoomedFFT">
+                                        <span style="font-size: 0.7rem;">FFT sur zone visible</span>
+                                    </label>
+                                </div>
+                                <div style="display: flex; gap: 1rem; align-items: center;">
+                                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                        <span style="font-size: 0.7rem; color: var(--text-secondary);">Zoom X:</span>
+                                        <button id="zoomOutBtn" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; min-width: 30px;">−</button>
+                                        <span id="zoomLevel" style="font-size: 0.7rem; color: var(--accent-primary); min-width: 50px; text-align: center;">1×</span>
+                                        <button id="zoomInBtn" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; min-width: 30px;">+</button>
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                        <span style="font-size: 0.7rem; color: var(--text-secondary);">Zoom Y:</span>
+                                        <button id="zoomYOutBtn" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; min-width: 30px;">−</button>
+                                        <span id="zoomYLevel" style="font-size: 0.7rem; color: var(--accent-success); min-width: 50px; text-align: center;">1×</span>
+                                        <button id="zoomYInBtn" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; min-width: 30px;">+</button>
+                                    </div>
+                                    <button id="zoomResetBtn" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.7rem;">Reset</button>
+                                </div>
+                            </div>
+                            <canvas id="debugWaveformCanvas" width="1200" height="200" style="width: 100%; max-width: 1200px; height: auto; background: var(--bg-tertiary); border-radius: 8px; border: 2px solid var(--accent-secondary); display: block; margin: 0 auto; cursor: move;"></canvas>
+                            <div style="margin-top: 0.25rem; text-align: center; font-size: 0.65rem; color: var(--text-secondary);">
+                                💡 Cliquez et glissez pour déplacer | Molette pour zoomer | Shift+Molette pour zoom vertical
+                            </div>
+                        </div>
+                        
+                        <!-- Raw FFT Spectrum -->
+                        <div style="margin-top: 1rem;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem; text-align: center;">Spectre FFT Brut (Sans traitement)</div>
+                            <canvas id="debugSpectrumCanvas" width="1200" height="400" style="width: 100%; max-width: 1200px; height: auto; background: var(--bg-tertiary); border-radius: 8px; border: 2px solid var(--accent-primary); display: block; margin: 0 auto;"></canvas>
+                        </div>
+                        
+                        <!-- FFT Stats -->
+                        <div id="debugStats" style="margin-top: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border); display: none;">
+                            <div style="font-size: 0.8rem; color: var(--accent-primary); margin-bottom: 0.5rem; font-weight: 600;">📊 Statistiques FFT</div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">
+                                <div>
+                                    <span style="color: var(--text-secondary);">Pic max:</span>
+                                    <span id="debugMaxPeak" style="color: var(--accent-primary); margin-left: 0.5rem;">—</span>
+                                </div>
+                                <div>
+                                    <span style="color: var(--text-secondary);">Magnitude max:</span>
+                                    <span id="debugMaxMagnitude" style="color: var(--accent-primary); margin-left: 0.5rem;">—</span>
+                                </div>
+                                <div>
+                                    <span style="color: var(--text-secondary);">Nombre de pics:</span>
+                                    <span id="debugPeakCount" style="color: var(--accent-primary); margin-left: 0.5rem;">—</span>
+                                </div>
+                                <div>
+                                    <span style="color: var(--text-secondary);">Résolution FFT:</span>
+                                    <span id="debugResolution" style="color: var(--accent-primary); margin-left: 0.5rem;">—</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Peak List -->
+                        <div id="debugPeakList" style="margin-top: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border); max-height: 300px; overflow-y: auto; display: none;">
+                            <div style="font-size: 0.8rem; color: var(--accent-primary); margin-bottom: 0.5rem; font-weight: 600;">🎵 Pics détectés (grave → aigu)</div>
+                            <div id="debugPeakListContent" style="font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; line-height: 1.6; color: var(--text-secondary);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tuner mode display (hidden by default) -->
+                    <div id="tunerModeDisplay" style="display: none;">
+                        <div style="text-align: center; margin-bottom: 1.5rem;">
+                            <div style="font-size: 1.5rem; color: var(--accent-primary); margin-bottom: 0.5rem;">🎵 Accordeur</div>
+                        </div>
+                        
+                        <!-- Tuner Type Selector -->
+                        <div style="margin-bottom: 1.5rem;">
+                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                                <button class="tuner-type-btn active" data-tuner-type="single" style="flex: 1; max-width: 200px; padding: 0.75rem; background: var(--bg-tertiary); border: 2px solid var(--accent-primary); border-radius: 8px; color: var(--text-primary); font-family: 'DM Sans', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                                    🎸 Corde par corde
+                                </button>
+                                <button class="tuner-type-btn" data-tuner-type="global" style="flex: 1; max-width: 200px; padding: 0.75rem; background: var(--bg-secondary); border: 2px solid var(--border); border-radius: 8px; color: var(--text-secondary); font-family: 'DM Sans', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                                    🎼 Accordage global
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Tuning Type Selector -->
+                        <div style="margin-bottom: 1.5rem;">
+                            <label style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; text-align: center;">Type d'accordage</label>
+                            <select id="tuningTypeSelect" style="width: 100%; max-width: 300px; margin: 0 auto; display: block; padding: 0.75rem; background: var(--bg-tertiary); border: 2px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'DM Sans', sans-serif; font-size: 0.9rem;">
+                                <option value="standard">Standard (E-A-D-G-B-E)</option>
+                                <option value="drop-d">Drop D (D-A-D-G-B-E)</option>
+                                <option value="drop-c">Drop C (C-G-C-F-A-D)</option>
+                                <option value="open-g">Open G (D-G-D-G-B-D)</option>
+                                <option value="open-d">Open D (D-A-D-F#-A-D)</option>
+                                <option value="dadgad">DADGAD (D-A-D-G-A-D)</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Single String Tuner (Corde par corde) -->
+                        <div id="singleStringTuner">
+                            <div style="text-align: center; margin-bottom: 0.75rem;">
+                                <div style="font-size: 0.9rem; color: var(--text-secondary);">Jouez une corde à vide</div>
+                            </div>
+                            
+                            <!-- Current Note Display -->
+                            <div style="text-align: center; margin-bottom: 2rem;">
+                                <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">Note détectée</div>
+                                <div id="tunerNoteName" style="font-size: 6rem; font-weight: 700; color: var(--accent-primary); line-height: 1; font-family: 'JetBrains Mono', monospace;">—</div>
+                                <div id="tunerFrequency" style="font-size: 1.2rem; color: var(--text-secondary); margin-top: 0.5rem; font-family: 'JetBrains Mono', monospace;">— Hz</div>
+                            </div>
+                            
+                            <!-- Tuning Meter -->
+                            <div style="margin-bottom: 2rem;">
+                                <div style="position: relative; height: 100px; background: var(--bg-tertiary); border-radius: 12px; overflow: hidden; border: 2px solid var(--border);">
+                                    <!-- Center line -->
+                                    <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; background: var(--text-secondary); z-index: 1;"></div>
+                                    
+                                    <!-- Tuning zones -->
+                                    <div style="position: absolute; left: 0; right: 50%; top: 0; bottom: 0; background: linear-gradient(to right, rgba(255, 100, 100, 0.2), rgba(255, 200, 100, 0.2));"></div>
+                                    <div style="position: absolute; left: 50%; right: 0; top: 0; bottom: 0; background: linear-gradient(to left, rgba(255, 100, 100, 0.2), rgba(255, 200, 100, 0.2));"></div>
+                                    <div style="position: absolute; left: 48%; right: 48%; top: 0; bottom: 0; background: rgba(0, 212, 170, 0.3); z-index: 0;"></div>
+                                    
+                                    <!-- Needle -->
+                                    <div id="tunerNeedle" style="position: absolute; left: 50%; top: 10px; bottom: 10px; width: 4px; margin-left: -2px; background: var(--accent-primary); border-radius: 2px; transition: transform 0.15s ease-out; z-index: 2; box-shadow: 0 0 10px rgba(0, 212, 170, 0.5);"></div>
+                                </div>
+                                
+                                <!-- Cents indicator -->
+                                <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-secondary);">
+                                    <span>−50¢</span>
+                                    <span id="tunerCents" style="color: var(--accent-primary); font-weight: 600; font-size: 0.9rem;">0¢</span>
+                                    <span>+50¢</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Tuning Status -->
+                            <div id="tunerStatus" style="text-align: center; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; border: 2px solid var(--border);">
+                                <div style="font-size: 1rem; color: var(--text-secondary);">🎸 Jouez une corde...</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Global Tuner (Accordage global) -->
+                        <div id="globalTuner" style="display: none;">
+                            <div style="text-align: center; margin-bottom: 1rem;">
+                                <div style="font-size: 0.9rem; color: var(--text-secondary);">Grattez toutes les cordes à vide</div>
+                            </div>
+                            
+                            <!-- Strings Status Grid -->
+                            <div id="stringsStatusGrid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.75rem; margin-bottom: 1.5rem;">
+                                <!-- Will be populated by JavaScript -->
+                            </div>
+                            
+                            <!-- Detected Notes Summary -->
+                            <div id="detectedNotesSummary" style="margin-bottom: 1.5rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border);">
+                                <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Notes détectées</div>
+                                <div id="detectedNotesContent" style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--text-primary);">
+                                    Aucune note détectée
+                                </div>
+                            </div>
+                            
+                            <!-- Strings to Adjust -->
+                            <div id="stringsToAdjust" style="margin-bottom: 1.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 2px solid var(--border);">
+                                <div style="font-size: 0.9rem; color: var(--accent-warning); margin-bottom: 0.75rem; font-weight: 600;">🔧 Cordes à ajuster</div>
+                                <div id="stringsToAdjustContent" style="font-size: 0.85rem; line-height: 1.6;">
+                                    Grattez toutes les cordes...
+                                </div>
+                            </div>
+                            
+                            <!-- Progress -->
+                            <div style="text-align: center; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; border: 2px solid var(--border);">
+                                <div id="globalTunerProgress" style="font-size: 1.1rem; font-weight: 600;">
+                                    <span style="color: var(--text-secondary);">Progression : </span>
+                                    <span id="globalTunerProgressCount" style="color: var(--accent-primary);">0/6</span>
+                                    <span style="color: var(--text-secondary);"> cordes OK</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Standard Guitar Tuning Reference -->
+                        <div id="tuningReference" style="margin-top: 2rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border);">
+                            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem; text-align: center;">Accordage de référence</div>
+                            <div id="tuningReferenceContent" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">
+                                <!-- Will be populated by JavaScript -->
                             </div>
                         </div>
                     </div>
@@ -1086,11 +1344,92 @@
 
         // All chords for complete level
         const allChordsList = Object.keys(chordDiagrams);
+        
+        // Tuner configurations
+        const tuningConfigs = {
+            'standard': {
+                name: 'Standard',
+                strings: [
+                    { note: 'E2', freq: 82.41, string: 6 },
+                    { note: 'A2', freq: 110.00, string: 5 },
+                    { note: 'D3', freq: 146.83, string: 4 },
+                    { note: 'G3', freq: 196.00, string: 3 },
+                    { note: 'B3', freq: 246.94, string: 2 },
+                    { note: 'E4', freq: 329.63, string: 1 }
+                ]
+            },
+            'drop-d': {
+                name: 'Drop D',
+                strings: [
+                    { note: 'D2', freq: 73.42, string: 6 },
+                    { note: 'A2', freq: 110.00, string: 5 },
+                    { note: 'D3', freq: 146.83, string: 4 },
+                    { note: 'G3', freq: 196.00, string: 3 },
+                    { note: 'B3', freq: 246.94, string: 2 },
+                    { note: 'E4', freq: 329.63, string: 1 }
+                ]
+            },
+            'drop-c': {
+                name: 'Drop C',
+                strings: [
+                    { note: 'C2', freq: 65.41, string: 6 },
+                    { note: 'G2', freq: 98.00, string: 5 },
+                    { note: 'C3', freq: 130.81, string: 4 },
+                    { note: 'F3', freq: 174.61, string: 3 },
+                    { note: 'A3', freq: 220.00, string: 2 },
+                    { note: 'D4', freq: 293.66, string: 1 }
+                ]
+            },
+            'open-g': {
+                name: 'Open G',
+                strings: [
+                    { note: 'D2', freq: 73.42, string: 6 },
+                    { note: 'G2', freq: 98.00, string: 5 },
+                    { note: 'D3', freq: 146.83, string: 4 },
+                    { note: 'G3', freq: 196.00, string: 3 },
+                    { note: 'B3', freq: 246.94, string: 2 },
+                    { note: 'D4', freq: 293.66, string: 1 }
+                ]
+            },
+            'open-d': {
+                name: 'Open D',
+                strings: [
+                    { note: 'D2', freq: 73.42, string: 6 },
+                    { note: 'A2', freq: 110.00, string: 5 },
+                    { note: 'D3', freq: 146.83, string: 4 },
+                    { note: 'F#3', freq: 185.00, string: 3 },
+                    { note: 'A3', freq: 220.00, string: 2 },
+                    { note: 'D4', freq: 293.66, string: 1 }
+                ]
+            },
+            'dadgad': {
+                name: 'DADGAD',
+                strings: [
+                    { note: 'D2', freq: 73.42, string: 6 },
+                    { note: 'A2', freq: 110.00, string: 5 },
+                    { note: 'D3', freq: 146.83, string: 4 },
+                    { note: 'G3', freq: 196.00, string: 3 },
+                    { note: 'A3', freq: 220.00, string: 2 },
+                    { note: 'D4', freq: 293.66, string: 1 }
+                ]
+            }
+        };
 
         // State
-        let currentMode = 'chords';
+        let currentMode = 'single';
         let currentDifficulty = 'intermediate';
         let currentExercise = null;
+        let currentTunerType = 'single'; // 'single' or 'global'
+        let currentTuning = 'standard';
+        let lastGlobalTuningCheck = 0; // Timestamp for global tuner updates
+        let lastSingleTunerDetection = 0; // Timestamp for last note detection
+        let lastSingleTunerNote = null; // Last detected note info (persists for 3 seconds)
+        const singleTunerPersistenceDuration = 5000; // 5 seconds persistence
+        
+        // Sliding average for tuner stability
+        let tunerFrequencyHistory = []; // Array of {timestamp, frequency, magnitude}
+        const tunerAverageWindow = 2000; // 2 seconds sliding window
+        const tunerMinMagnitude = -55; // Minimum magnitude to consider (dB)
         
         // Note definitions for each difficulty level
         const difficultyLevels = {
@@ -1169,6 +1508,21 @@
         let speedModeCorrectCount = 0;
         let speedModeStartTime = 0;
         
+        // Debug mode variables
+        let debugModeActive = false;
+        let debugCaptureStartTime = 0;
+        let debugCaptureScheduled = false;
+        let debugFrozenFFT = null;
+        let waveformZoom = 1;
+        let waveformZoomY = 1;
+        let waveformOffset = 0;
+        let waveformOffsetY = 0;
+        let waveformDragging = false;
+        let waveformDragStartX = 0;
+        let waveformDragStartY = 0;
+        let waveformDragStartOffset = 0;
+        let waveformDragStartOffsetY = 0;
+        
         // Fretboard state - track which strings are enabled
         let enabledStrings = {};
         
@@ -1215,6 +1569,7 @@
         const advanceDelayInput = document.getElementById('advanceDelay');
         const strumDelayInput = document.getElementById('strumDelay');
         const detectionSensitivityInput = document.getElementById('detectionSensitivity');
+        const maxNotesDetectedSelect = document.getElementById('maxNotesDetected');
         const sensitivityValueDisplay = document.getElementById('sensitivityValue');
         const playSoundCheckbox = document.getElementById('playSoundCheckbox');
         const speedModeDurationInput = document.getElementById('speedModeDuration');
@@ -1224,6 +1579,7 @@
         const speedModeStartBtn = document.getElementById('speedModeStartBtn');
         const speedModeDurationDisplay = document.getElementById('speedModeDurationDisplay');
         const showFretboardCheckbox = document.getElementById('showFretboardCheckbox');
+        const fretboardVisualizationSection = document.getElementById('fretboardVisualizationSection');
         const instrumentSelection = document.getElementById('instrumentSelection');
         const fretCountSelection = document.getElementById('fretCountSelection');
         const instrumentType = document.getElementById('instrumentType');
@@ -1237,6 +1593,43 @@
         const displayPanel = document.querySelector('.display-panel');
         const speedModeSettings = document.getElementById('speedModeSettings');
         const chordsModeSettings = document.getElementById('chordsModeSettings');
+        const debugModeSettings = document.getElementById('debugModeSettings');
+        const debugModeDisplay = document.getElementById('debugModeDisplay');
+        const tunerModeDisplay = document.getElementById('tunerModeDisplay');
+        const tunerNoteName = document.getElementById('tunerNoteName');
+        const tunerFrequency = document.getElementById('tunerFrequency');
+        const tunerNeedle = document.getElementById('tunerNeedle');
+        const tunerCents = document.getElementById('tunerCents');
+        const tunerStatus = document.getElementById('tunerStatus');
+        const tuningTypeSelect = document.getElementById('tuningTypeSelect');
+        const singleStringTuner = document.getElementById('singleStringTuner');
+        const globalTuner = document.getElementById('globalTuner');
+        const stringsStatusGrid = document.getElementById('stringsStatusGrid');
+        const detectedNotesContent = document.getElementById('detectedNotesContent');
+        const stringsToAdjustContent = document.getElementById('stringsToAdjustContent');
+        const globalTunerProgressCount = document.getElementById('globalTunerProgressCount');
+        const tuningReferenceContent = document.getElementById('tuningReferenceContent');
+        const debugWaveformCanvas = document.getElementById('debugWaveformCanvas');
+        const debugSpectrumCanvas = document.getElementById('debugSpectrumCanvas');
+        const debugStatus = document.getElementById('debugStatus');
+        const debugStats = document.getElementById('debugStats');
+        const debugPeakList = document.getElementById('debugPeakList');
+        const debugPeakListContent = document.getElementById('debugPeakListContent');
+        const debugMaxPeak = document.getElementById('debugMaxPeak');
+        const debugMaxMagnitude = document.getElementById('debugMaxMagnitude');
+        const debugPeakCount = document.getElementById('debugPeakCount');
+        const debugResolution = document.getElementById('debugResolution');
+        const debugCaptureDelayInput = document.getElementById('debugCaptureDelay');
+        const debugBufferDurationSelect = document.getElementById('debugBufferDuration');
+        const debugResetBtn = document.getElementById('debugResetBtn');
+        const useZoomedFFT = document.getElementById('useZoomedFFT');
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const zoomYInBtn = document.getElementById('zoomYInBtn');
+        const zoomYOutBtn = document.getElementById('zoomYOutBtn');
+        const zoomResetBtn = document.getElementById('zoomResetBtn');
+        const zoomLevel = document.getElementById('zoomLevel');
+        const zoomYLevel = document.getElementById('zoomYLevel');
         const chordTypeMajor = document.getElementById('chordTypeMajor');
         const chordTypeMinor = document.getElementById('chordTypeMinor');
         const chordsLevel = document.getElementById('chordsLevel');
@@ -1640,6 +2033,9 @@
                     speedModeStats.style.display = 'block';
                     speedModeSettings.style.display = 'block';
                     chordsModeSettings.style.display = 'none';
+                    debugModeSettings.style.display = 'none';
+                    debugModeDisplay.style.display = 'none';
+                    fretboardVisualizationSection.style.display = 'block'; // Show in speed mode
                     controlButtons.style.display = 'none';
                     singleNoteDisplay.style.display = 'block';
                     chordNotesDisplay.style.display = 'none';
@@ -1648,21 +2044,63 @@
                     speedModeStats.style.display = 'none';
                     speedModeSettings.style.display = 'none';
                     chordsModeSettings.style.display = 'block';
+                    debugModeSettings.style.display = 'none';
+                    debugModeDisplay.style.display = 'none';
+                    fretboardVisualizationSection.style.display = 'block'; // Show in chords mode
                     controlButtons.style.display = 'flex';
                     singleNoteDisplay.style.display = 'block'; // Show for chord name display
                     chordNotesDisplay.style.display = 'block'; // Show chord notes info
                     stopSpeedMode();
+                } else if (currentMode === 'debug') {
+                    console.log('🔬 Switching to debug mode');
+                    speedModeStats.style.display = 'none';
+                    speedModeSettings.style.display = 'none';
+                    chordsModeSettings.style.display = 'none';
+                    debugModeSettings.style.display = 'block';
+                    debugModeDisplay.style.display = 'block';
+                    tunerModeDisplay.style.display = 'none';
+                    fretboardVisualizationSection.style.display = 'none'; // Hide fretboard section in debug mode
+                    fretboardDisplay.style.display = 'none'; // Hide fretboard display in debug mode
+                    controlButtons.style.display = 'none';
+                    singleNoteDisplay.style.display = 'none';
+                    chordNotesDisplay.style.display = 'none';
+                    stopSpeedMode();
+                    resetDebugMode();
+                } else if (currentMode === 'tuner') {
+                    console.log('🎵 Switching to tuner mode');
+                    speedModeStats.style.display = 'none';
+                    speedModeSettings.style.display = 'none';
+                    chordsModeSettings.style.display = 'none';
+                    debugModeSettings.style.display = 'none';
+                    debugModeDisplay.style.display = 'none';
+                    tunerModeDisplay.style.display = 'block';
+                    fretboardVisualizationSection.style.display = 'none'; // Hide in tuner mode (not needed)
+                    controlButtons.style.display = 'none';
+                    singleNoteDisplay.style.display = 'none';
+                    chordNotesDisplay.style.display = 'none';
+                    stopSpeedMode();
+                    updateTuningReference();
+                    if (currentTunerType === 'global') {
+                        initGlobalTuner();
+                    }
                 } else {
                     speedModeStats.style.display = 'none';
                     speedModeSettings.style.display = 'none';
                     chordsModeSettings.style.display = 'none';
+                    debugModeSettings.style.display = 'none';
+                    debugModeDisplay.style.display = 'none';
+                    tunerModeDisplay.style.display = 'none';
+                    fretboardVisualizationSection.style.display = 'block'; // Show in single note mode
                     controlButtons.style.display = 'flex';
                     singleNoteDisplay.style.display = 'block';
                     chordNotesDisplay.style.display = 'none';
                     stopSpeedMode();
                 }
                 
-                generateExercise();
+                // Don't generate exercise in debug or tuner mode
+                if (currentMode !== 'debug' && currentMode !== 'tuner') {
+                    generateExercise();
+                }
             });
         });
 
@@ -1679,6 +2117,45 @@
                 generateExercise();
             });
         });
+
+        // Tuner type selection (Single vs Global)
+        const tunerTypeButtons = document.querySelectorAll('.tuner-type-btn');
+        tunerTypeButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tunerTypeButtons.forEach(b => {
+                    b.classList.remove('active');
+                    b.style.background = 'var(--bg-secondary)';
+                    b.style.borderColor = 'var(--border)';
+                    b.style.color = 'var(--text-secondary)';
+                });
+                btn.classList.add('active');
+                btn.style.background = 'var(--bg-tertiary)';
+                btn.style.borderColor = 'var(--accent-primary)';
+                btn.style.color = 'var(--text-primary)';
+                
+                currentTunerType = btn.dataset.tunerType;
+                
+                if (currentTunerType === 'single') {
+                    singleStringTuner.style.display = 'block';
+                    globalTuner.style.display = 'none';
+                } else {
+                    singleStringTuner.style.display = 'none';
+                    globalTuner.style.display = 'block';
+                    initGlobalTuner();
+                }
+            });
+        });
+        
+        // Tuning type selection
+        if (tuningTypeSelect) {
+            tuningTypeSelect.addEventListener('change', (e) => {
+                currentTuning = e.target.value;
+                updateTuningReference();
+                if (currentTunerType === 'global') {
+                    initGlobalTuner();
+                }
+            });
+        }
 
         // Generate exercise
         function initializeNotesPool() {
@@ -2470,8 +2947,8 @@
                 microphone = audioContext.createMediaStreamSource(microphoneStream);
                 
                 // Increase FFT size for better frequency resolution
-                analyser.fftSize = 16384; // Increased from 8192 for better bass frequency resolution (2.7 Hz per bin)
-                analyser.smoothingTimeConstant = 0.3; // Add smoothing to stabilize signal (0 = no smoothing, 1 = max smoothing)
+                analyser.fftSize = 32768; // Doubled for even better bass frequency resolution (1.35 Hz per bin)
+                analyser.smoothingTimeConstant = 0.6; // Increased smoothing for more stable signal (0 = no smoothing, 1 = max smoothing)
                 
                 // Add high-pass filter to remove low-frequency noise
                 const highpass = audioContext.createBiquadFilter();
@@ -2541,6 +3018,140 @@
             }
         }
 
+        // ===== TUNER UTILITY FUNCTIONS =====
+        
+        function updateTuningReference() {
+            const config = tuningConfigs[currentTuning];
+            if (!config || !tuningReferenceContent) return;
+            
+            tuningReferenceContent.innerHTML = config.strings.map(s => `
+                <div style="text-align: center; padding: 0.5rem; background: var(--bg-tertiary); border-radius: 4px;">
+                    <div style="color: var(--accent-primary); font-weight: 600;">${s.note}</div>
+                    <div style="color: var(--text-secondary); font-size: 0.65rem;">${s.freq.toFixed(1)}Hz</div>
+                    <div style="color: var(--text-secondary); font-size: 0.6rem;">Corde ${s.string}</div>
+                </div>
+            `).join('');
+        }
+        
+        function initGlobalTuner() {
+            const config = tuningConfigs[currentTuning];
+            if (!config || !stringsStatusGrid) return;
+            
+            // Build the grid of string status boxes
+            stringsStatusGrid.innerHTML = config.strings.map(s => `
+                <div id="string-status-${s.string}" style="text-align: center; padding: 0.75rem; background: var(--bg-tertiary); border-radius: 8px; border: 2px solid var(--border); transition: all 0.3s;">
+                    <div style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Corde ${s.string}</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">${s.note}</div>
+                    <div id="string-freq-${s.string}" style="font-size: 0.65rem; color: var(--text-secondary); margin-bottom: 0.5rem;">—</div>
+                    <div id="string-status-icon-${s.string}" style="font-size: 1.5rem;">⚪</div>
+                    <div id="string-cents-${s.string}" style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.25rem; font-family: 'JetBrains Mono', monospace;">—</div>
+                </div>
+            `).join('');
+        }
+        
+        function updateGlobalTuner(detectedNotes) {
+            const config = tuningConfigs[currentTuning];
+            if (!config) return;
+            
+            let okCount = 0;
+            const toAdjust = [];
+            const detectedSummary = [];
+            
+            // Reset all strings to "not detected"
+            config.strings.forEach(expectedString => {
+                const box = document.getElementById(`string-status-${expectedString.string}`);
+                const freqEl = document.getElementById(`string-freq-${expectedString.string}`);
+                const iconEl = document.getElementById(`string-status-icon-${expectedString.string}`);
+                const centsEl = document.getElementById(`string-cents-${expectedString.string}`);
+                
+                if (!box) return;
+                
+                // Find if this string was detected
+                const detected = detectedNotes.find(d => {
+                    // Match by note name (e.g., "D3" matches "D3")
+                    return d.note === expectedString.note;
+                });
+                
+                if (detected) {
+                    const cents = 1200 * Math.log2(detected.frequency / expectedString.freq);
+                    const absCents = Math.abs(cents);
+                    
+                    freqEl.textContent = `${detected.frequency.toFixed(1)} Hz`;
+                    centsEl.textContent = `${cents >= 0 ? '+' : ''}${cents.toFixed(1)}¢`;
+                    
+                    detectedSummary.push(`${expectedString.note} (${detected.frequency.toFixed(1)} Hz, ${cents >= 0 ? '+' : ''}${cents.toFixed(1)}¢)`);
+                    
+                    if (absCents < 5) {
+                        // Perfect tuning
+                        okCount++;
+                        iconEl.textContent = '✅';
+                        box.style.borderColor = 'var(--accent-success)';
+                        box.style.background = 'rgba(0, 212, 170, 0.1)';
+                    } else if (absCents < 10) {
+                        // Close
+                        iconEl.textContent = '⚠️';
+                        box.style.borderColor = 'var(--accent-primary)';
+                        box.style.background = 'var(--bg-tertiary)';
+                        toAdjust.push(`• ${expectedString.note} (corde ${expectedString.string}) : ${cents >= 0 ? '+' : ''}${cents.toFixed(1)}¢ → Ajustez légèrement`);
+                    } else if (cents > 0) {
+                        // Too sharp
+                        iconEl.textContent = '⬆️';
+                        box.style.borderColor = 'var(--accent-warning)';
+                        box.style.background = 'rgba(255, 180, 0, 0.1)';
+                        toAdjust.push(`• ${expectedString.note} (corde ${expectedString.string}) : +${cents.toFixed(1)}¢ → <span style="color: var(--accent-warning);">Desserrez</span>`);
+                    } else {
+                        // Too flat
+                        iconEl.textContent = '⬇️';
+                        box.style.borderColor = 'var(--accent-danger)';
+                        box.style.background = 'rgba(255, 80, 80, 0.1)';
+                        toAdjust.push(`• ${expectedString.note} (corde ${expectedString.string}) : ${cents.toFixed(1)}¢ → <span style="color: var(--accent-danger);">Tendez</span>`);
+                    }
+                } else {
+                    // Not detected
+                    freqEl.textContent = '—';
+                    iconEl.textContent = '⚪';
+                    centsEl.textContent = '—';
+                    box.style.borderColor = 'var(--border)';
+                    box.style.background = 'var(--bg-tertiary)';
+                }
+            });
+            
+            // Update detected notes summary
+            if (detectedNotesContent) {
+                if (detectedSummary.length > 0) {
+                    detectedNotesContent.innerHTML = detectedSummary.join('<br>');
+                } else {
+                    detectedNotesContent.textContent = 'Aucune note détectée';
+                }
+            }
+            
+            // Update strings to adjust
+            if (stringsToAdjustContent) {
+                if (toAdjust.length > 0) {
+                    stringsToAdjustContent.innerHTML = toAdjust.join('<br>');
+                } else if (detectedSummary.length === 0) {
+                    stringsToAdjustContent.textContent = 'Grattez toutes les cordes...';
+                } else {
+                    stringsToAdjustContent.innerHTML = '<span style="color: var(--accent-success);">✅ Toutes les cordes détectées sont bien accordées !</span>';
+                }
+            }
+            
+            // Update progress
+            if (globalTunerProgressCount) {
+                globalTunerProgressCount.textContent = `${okCount}/6`;
+                if (okCount === 6) {
+                    globalTunerProgressCount.style.color = 'var(--accent-success)';
+                    if (stringsToAdjustContent) {
+                        stringsToAdjustContent.innerHTML = '<span style="color: var(--accent-success); font-size: 1.1rem;">🎉 Guitare parfaitement accordée !</span>';
+                    }
+                } else {
+                    globalTunerProgressCount.style.color = 'var(--accent-primary)';
+                }
+            }
+        }
+        
+        // ===== MAIN PITCH DETECTION LOOP =====
+        
         function detectPitch() {
             if (!isListening) return;
             
@@ -2565,6 +3176,276 @@
                 return;
             }
             
+            // ===== TUNER MODE: Continuous note detection with cents display =====
+            if (currentMode === 'tuner') {
+                if (currentTunerType === 'single') {
+                    // SINGLE STRING TUNER: FFT-based detection with sliding average
+                    const now = Date.now();
+                    
+                    // Get FFT data
+                    const fftData = getFFTData();
+                    const { dataArray, bufferLength, nyquist } = fftData;
+                    
+                    // Find strongest peak in guitar range
+                    let maxMagnitude = -Infinity;
+                    let maxFrequency = 0;
+                    
+                    for (let i = 0; i < bufferLength; i++) {
+                        const magnitude = dataArray[i];
+                        if (magnitude > tunerMinMagnitude) {
+                            const frequency = (i * nyquist) / bufferLength;
+                            
+                            // Guitar range: 60-400 Hz
+                            if (frequency >= 60 && frequency <= 400) {
+                                if (magnitude > maxMagnitude) {
+                                    maxMagnitude = magnitude;
+                                    maxFrequency = frequency;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Add to history if valid
+                    if (maxFrequency > 0 && maxMagnitude > tunerMinMagnitude) {
+                        tunerFrequencyHistory.push({
+                            timestamp: now,
+                            frequency: maxFrequency,
+                            magnitude: maxMagnitude
+                        });
+                    }
+                    
+                    // Clean old entries (older than 2 seconds)
+                    tunerFrequencyHistory = tunerFrequencyHistory.filter(entry => 
+                        now - entry.timestamp < tunerAverageWindow
+                    );
+                    
+                    // Calculate weighted average (recent samples weighted more)
+                    if (tunerFrequencyHistory.length > 0) {
+                        let totalWeight = 0;
+                        let weightedFreqSum = 0;
+                        
+                        tunerFrequencyHistory.forEach(entry => {
+                            const age = now - entry.timestamp;
+                            // Linear weight: recent = 1.0, old (2s ago) = 0.2
+                            const ageWeight = 1.0 - (age / tunerAverageWindow) * 0.8;
+                            // Magnitude weight: louder = more important
+                            const magWeight = Math.pow(10, (entry.magnitude - maxMagnitude) / 20);
+                            const weight = ageWeight * magWeight;
+                            
+                            weightedFreqSum += entry.frequency * weight;
+                            totalWeight += weight;
+                        });
+                        
+                        const averagedFrequency = weightedFreqSum / totalWeight;
+                        const note = frequencyToNote(averagedFrequency);
+                        
+                        if (note) {
+                            // Calculate cents deviation from perfect pitch
+                            const noteFreq = noteToFrequency(note);
+                            const cents = 1200 * Math.log2(averagedFrequency / noteFreq);
+                            
+                            // Store this detection for persistence
+                            lastSingleTunerDetection = now;
+                            lastSingleTunerNote = {
+                                note: note,
+                                frequency: averagedFrequency,
+                                cents: cents,
+                                sampleCount: tunerFrequencyHistory.length
+                            };
+                            
+                            // Update display
+                            tunerNoteName.textContent = note;
+                            tunerFrequency.textContent = `${averagedFrequency.toFixed(1)} Hz`;
+                            tunerCents.textContent = `${cents >= 0 ? '+' : ''}${cents.toFixed(1)}¢`;
+                            
+                            // Move needle (-50 to +50 cents range)
+                            const needlePercent = Math.max(-50, Math.min(50, cents));
+                            tunerNeedle.style.transform = `translateX(${needlePercent * 2}%)`;
+                            
+                            // Update status based on tuning accuracy
+                            let statusHTML = '';
+                            
+                            if (Math.abs(cents) < 5) {
+                                statusHTML = '✅ <span style="color: var(--accent-success); font-weight: 600;">Parfaitement accordé !</span>';
+                                tunerNeedle.style.background = 'var(--accent-success)';
+                                tunerNeedle.style.boxShadow = '0 0 15px var(--accent-success)';
+                            } else if (Math.abs(cents) < 10) {
+                                statusHTML = '👍 <span style="color: var(--accent-primary); font-weight: 600;">Presque ! Ajustez légèrement</span>';
+                                tunerNeedle.style.background = 'var(--accent-primary)';
+                                tunerNeedle.style.boxShadow = '0 0 10px var(--accent-primary)';
+                            } else if (cents > 0) {
+                                statusHTML = '⬆️ <span style="color: var(--accent-warning); font-weight: 600;">Trop aigu - Desserrez la corde</span>';
+                                tunerNeedle.style.background = 'var(--accent-warning)';
+                                tunerNeedle.style.boxShadow = '0 0 10px var(--accent-warning)';
+                            } else {
+                                statusHTML = '⬇️ <span style="color: var(--accent-danger); font-weight: 600;">Trop grave - Tendez la corde</span>';
+                                tunerNeedle.style.background = 'var(--accent-danger)';
+                                tunerNeedle.style.boxShadow = '0 0 10px var(--accent-danger)';
+                            }
+                            
+                            // Add sample count for debugging
+                            const stability = tunerFrequencyHistory.length >= 20 ? '🔒' : tunerFrequencyHistory.length >= 10 ? '⚡' : '📡';
+                            tunerStatus.innerHTML = `<div style="font-size: 1rem;">${statusHTML} <span style="font-size: 0.75rem; color: var(--text-secondary);">${stability} ${tunerFrequencyHistory.length} échantillons</span></div>`;
+                            
+                            // Reset opacity
+                            tunerNoteName.style.opacity = 1;
+                            tunerFrequency.style.opacity = 1;
+                            tunerCents.style.opacity = 1;
+                        }
+                    } else {
+                        // No valid frequency detected - check if we should show persisted note
+                        const timeSinceLastDetection = now - lastSingleTunerDetection;
+                        
+                        if (lastSingleTunerNote && timeSinceLastDetection < singleTunerPersistenceDuration) {
+                            // Show persisted note (with slight opacity to indicate it's old)
+                            const remainingTime = singleTunerPersistenceDuration - timeSinceLastDetection;
+                            const fadeStart = 3000; // Start fading after 3 seconds
+                            
+                            tunerNoteName.textContent = lastSingleTunerNote.note;
+                            tunerFrequency.textContent = `${lastSingleTunerNote.frequency.toFixed(1)} Hz`;
+                            tunerCents.textContent = `${lastSingleTunerNote.cents >= 0 ? '+' : ''}${lastSingleTunerNote.cents.toFixed(1)}¢`;
+                            
+                            // Keep needle position
+                            const needlePercent = Math.max(-50, Math.min(50, lastSingleTunerNote.cents));
+                            tunerNeedle.style.transform = `translateX(${needlePercent * 2}%)`;
+                            
+                            // Apply fade effect if in fade period
+                            if (timeSinceLastDetection > fadeStart) {
+                                const fadeProgress = (timeSinceLastDetection - fadeStart) / (singleTunerPersistenceDuration - fadeStart);
+                                const opacity = 1 - (fadeProgress * 0.5); // Fade from 1 to 0.5
+                                tunerNoteName.style.opacity = opacity;
+                                tunerFrequency.style.opacity = opacity;
+                                tunerCents.style.opacity = opacity;
+                            } else {
+                                tunerNoteName.style.opacity = 1;
+                                tunerFrequency.style.opacity = 1;
+                                tunerCents.style.opacity = 1;
+                            }
+                            
+                            // Update status to show it's persisted
+                            let statusHTML = '';
+                            const cents = lastSingleTunerNote.cents;
+                            
+                            if (Math.abs(cents) < 5) {
+                                statusHTML = '✅ <span style="color: var(--accent-success); font-weight: 600;">Parfaitement accordé !</span>';
+                                tunerNeedle.style.background = 'var(--accent-success)';
+                                tunerNeedle.style.boxShadow = '0 0 15px var(--accent-success)';
+                            } else if (Math.abs(cents) < 10) {
+                                statusHTML = '👍 <span style="color: var(--accent-primary); font-weight: 600;">Presque ! Ajustez légèrement</span>';
+                                tunerNeedle.style.background = 'var(--accent-primary)';
+                                tunerNeedle.style.boxShadow = '0 0 10px var(--accent-primary)';
+                            } else if (cents > 0) {
+                                statusHTML = '⬆️ <span style="color: var(--accent-warning); font-weight: 600;">Trop aigu - Desserrez la corde</span>';
+                                tunerNeedle.style.background = 'var(--accent-warning)';
+                                tunerNeedle.style.boxShadow = '0 0 10px var(--accent-warning)';
+                            } else {
+                                statusHTML = '⬇️ <span style="color: var(--accent-danger); font-weight: 600;">Trop grave - Tendez la corde</span>';
+                                tunerNeedle.style.background = 'var(--accent-danger)';
+                                tunerNeedle.style.boxShadow = '0 0 10px var(--accent-danger)';
+                            }
+                            
+                            tunerStatus.innerHTML = `<div style="font-size: 1rem;">${statusHTML} <span style="font-size: 0.8rem; color: var(--text-secondary);">(${Math.ceil(remainingTime / 1000)}s)</span></div>`;
+                        } else {
+                            // No note detected and persistence expired - reset display
+                            tunerNoteName.textContent = '—';
+                            tunerFrequency.textContent = '— Hz';
+                            tunerCents.textContent = '0¢';
+                            tunerNeedle.style.transform = 'translateX(0)';
+                            tunerNeedle.style.background = 'var(--accent-primary)';
+                            tunerStatus.innerHTML = '<div style="font-size: 1rem; color: var(--text-secondary);">🎸 Jouez une corde...</div>';
+                            
+                            // Reset opacity
+                            tunerNoteName.style.opacity = 1;
+                            tunerFrequency.style.opacity = 1;
+                            tunerCents.style.opacity = 1;
+                            
+                            // Clear persisted note and history
+                            lastSingleTunerNote = null;
+                            tunerFrequencyHistory = [];
+                        }
+                    }
+                } else {
+                    // GLOBAL TUNER: Detect all strings with FFT
+                    // Only update every 500ms to avoid too frequent updates
+                    const now = Date.now();
+                    if (now - lastGlobalTuningCheck < 500) {
+                        requestAnimationFrame(detectPitch);
+                        return;
+                    }
+                    lastGlobalTuningCheck = now;
+                    
+                    // Use FFT-based detection (same as chord mode)
+                    const fftData = getFFTData();
+                    const detectedNotes = detectChordFromFFT(fftData);
+                    
+                    // Convert to format with frequencies
+                    const notesWithFreq = window.lastDetectedNotesWithFreq || [];
+                    
+                    updateGlobalTuner(notesWithFreq);
+                }
+                
+                requestAnimationFrame(detectPitch);
+                return; // Exit early, don't run other mode logic
+            }
+            
+            // ===== DEBUG MODE: Handle separately, before note detection logic =====
+            if (currentMode === 'debug') {
+                const fftData = getFFTData();
+                const maxMagnitude = Math.max(...fftData.dataArray);
+                const minDb = parseInt(detectionSensitivityInput?.value || -60);
+                const hasSound = fftData.dataArray.some(magnitude => magnitude > minDb);
+                
+                // Log periodically
+                if (Date.now() % 2000 < 50) {
+                    console.log(`🔬 Debug mode tick: hasSound=${hasSound}, maxMag=${maxMagnitude.toFixed(1)}dB, scheduled=${debugCaptureScheduled}`);
+                }
+                
+                if (!hasSound) {
+                    // No sound - reset if not already captured
+                    if (!debugCaptureScheduled) {
+                        debugCaptureStartTime = 0;
+                    }
+                } else {
+                    // Sound detected
+                    const currentTime = Date.now();
+                    
+                    // Start timer on first sound (only if not already captured)
+                    if (debugCaptureStartTime === 0 && !debugCaptureScheduled) {
+                        debugCaptureStartTime = currentTime;
+                        console.log('🔬 Debug: Sound detected, starting timer');
+                        if (debugStatus) {
+                            debugStatus.textContent = '🎵 Signal détecté, capture en cours...';
+                            debugStatus.style.color = 'var(--accent-primary)';
+                        }
+                    }
+                    
+                    const timeSinceStart = currentTime - debugCaptureStartTime;
+                    const captureDelay = parseInt(debugCaptureDelayInput?.value || 600);
+                    
+                    // Perform ONE capture after delay
+                    if (!debugCaptureScheduled && timeSinceStart >= captureDelay) {
+                        console.log(`🔬 Debug: Capturing FFT after ${timeSinceStart}ms`);
+                        debugCaptureScheduled = true;
+                        
+                        // Capture time domain data with user-configured duration
+                        const bufferDuration = parseInt(debugBufferDurationSelect?.value || 743);
+                        const bufferSamples = Math.floor(bufferDuration * 44.1); // Convert ms to samples at 44.1kHz
+                        const actualBufferSize = Math.min(bufferSamples, analyser.fftSize);
+                        
+                        const timeDomainBuffer = new Float32Array(actualBufferSize);
+                        analyser.getFloatTimeDomainData(timeDomainBuffer);
+                        
+                        console.log(`🔬 Captured ${actualBufferSize} samples (${(actualBufferSize / 44.1).toFixed(1)}ms)`);
+                        
+                        captureDebugFFT(fftData, timeDomainBuffer);
+                    }
+                }
+                
+                requestAnimationFrame(detectPitch);
+                return; // Exit early, don't run normal note detection
+            }
+            
+            // ===== NORMAL NOTE DETECTION (for other modes) =====
             if (frequency > 0) {
                 const note = frequencyToNote(frequency);
                 const currentTime = Date.now();
@@ -3037,7 +3918,7 @@
                 const rotated = [...sortedNotes.slice(i), ...sortedNotes.slice(0, i)];
                 const rotatedSet = rotated.join(',');
                 if (chordDatabase[rotatedSet]) {
-                    return chordDatabase[rotatedSet] + ' (inversion)';
+                    return chordDatabase[rotatedSet];
                 }
             }
             
@@ -3099,13 +3980,20 @@
             const peakThreshold = 5; // Base threshold for peak detection
             
             for (let i = 2; i < bufferLength - 2; i++) {
-                if (dataArray[i] > minDb) {
-                    const frequency = (i * nyquist) / bufferLength;
-                    
-                    // Dynamic peak threshold: lower for D string range (more sensitive)
+                const frequency = (i * nyquist) / bufferLength;
+                
+                // SPECIAL CASE: D/D#/E string fundamentals (140-170 Hz) get lower threshold
+                // This frequency range is often very weak compared to harmonics
+                let dynamicMinDb = minDb;
+                if (frequency >= 140 && frequency <= 170) {
+                    dynamicMinDb = Math.min(minDb, -75); // Accept down to -75 dB for D3/D#3/E3 range
+                }
+                
+                if (dataArray[i] > dynamicMinDb) {
+                    // Dynamic peak threshold: lower for D/D#/E string range (more sensitive)
                     let dynamicPeakThreshold = peakThreshold;
-                    if (frequency >= 140 && frequency <= 155) {
-                        dynamicPeakThreshold = 3; // More sensitive in D range
+                    if (frequency >= 140 && frequency <= 170) {
+                        dynamicPeakThreshold = 3; // More sensitive in D/D#/E range
                     }
                     
                     // Check if this is a local maximum
@@ -3131,23 +4019,64 @@
                 }
             }
             
+            // SPECIAL CASE: Force detection of D3 (147 Hz) if present but weak
+            // This helps when D3 fundamental is real but not detected as a strong local peak
+            const d3TargetFreq = 146.83;
+            const d3Index = Math.round((d3TargetFreq * bufferLength) / nyquist);
+            
+            if (d3Index >= 0 && d3Index < bufferLength) {
+                const d3Magnitude = dataArray[d3Index];
+                
+                // Check if there's energy at D3 frequency that wasn't caught as a peak
+                if (d3Magnitude > minDb) {
+                    const alreadyHasD3 = peaks.some(p => p.frequency >= 140 && p.frequency <= 155);
+                    
+                    if (!alreadyHasD3) {
+                        // Check a small window around D3 for the actual peak
+                        let maxInWindow = d3Magnitude;
+                        let maxIndex = d3Index;
+                        for (let offset = -3; offset <= 3; offset++) {
+                            const idx = d3Index + offset;
+                            if (idx >= 2 && idx < bufferLength - 2 && dataArray[idx] > maxInWindow) {
+                                maxInWindow = dataArray[idx];
+                                maxIndex = idx;
+                            }
+                        }
+                        
+                        const forcedFreq = (maxIndex * nyquist) / bufferLength;
+                        console.log(`🔧 FORCED D3 detection: ${forcedFreq.toFixed(1)}Hz at ${maxInWindow.toFixed(1)}dB (not caught as regular peak)`);
+                        
+                        peaks.push({
+                            frequency: forcedFreq,
+                            magnitude: maxInWindow
+                        });
+                    }
+                }
+            }
+            
             // Sort peaks by frequency (lowest first)
             peaks.sort((a, b) => a.frequency - b.frequency);
             
             // Find maximum magnitude for relative filtering
             const maxMagnitude = Math.max(...peaks.map(p => p.magnitude));
-            const magnitudeThreshold = 18; // dB - increased to 18 for better harmonic filtering with louder playing
+            const magnitudeThreshold = 17; // dB - Increased to better filter strong harmonics (especially 3x)
             
             // BOOST LOW FREQUENCIES: Add virtual magnitude boost to favor fundamentals over harmonics
             // This helps when harmonics are stronger than the fundamental (common with D string)
             peaks.forEach(peak => {
-                // Apply frequency-dependent boost: stronger for lower frequencies
-                if (peak.frequency < 200) {
-                    // Low frequencies (E2, A2, D3, G3) get +6dB boost
+                // Apply frequency-dependent boost: MUCH stronger for lower frequencies
+                if (peak.frequency < 150) {
+                    // Very low frequencies (E2, A2, low D3) get massive boost
+                    peak.boostedMagnitude = peak.magnitude + 18;
+                } else if (peak.frequency < 200) {
+                    // Low frequencies (D3, G3) get +15dB boost
+                    peak.boostedMagnitude = peak.magnitude + 15;
+                } else if (peak.frequency < 250) {
+                    // Mid-low frequencies (B3) get +10dB boost
+                    peak.boostedMagnitude = peak.magnitude + 10;
+                } else if (peak.frequency < 350) {
+                    // Mid frequencies get +6dB boost
                     peak.boostedMagnitude = peak.magnitude + 6;
-                } else if (peak.frequency < 300) {
-                    // Mid-low frequencies get +3dB boost
-                    peak.boostedMagnitude = peak.magnitude + 3;
                 } else {
                     // Higher frequencies get no boost
                     peak.boostedMagnitude = peak.magnitude;
@@ -3162,24 +4091,25 @@
             if (peaks.length > 0) {
                 console.log(`🔍 All peaks found: ${peaks.map(p => `${Math.round(p.frequency)}Hz (${p.magnitude.toFixed(1)}dB)`).join(', ')}`);
                 
-                // Special debug for D string detection (146.83 Hz) and its octave (293.66 Hz)
-                const dPeaks = peaks.filter(p => p.frequency >= 140 && p.frequency <= 155);
+                // Special debug for D/D#/E string detection and octave
+                const lowPeaks = peaks.filter(p => p.frequency >= 140 && p.frequency <= 170);
                 const dOctavePeaks = peaks.filter(p => p.frequency >= 285 && p.frequency <= 302);
                 
-                if (dPeaks.length > 0) {
-                    console.log(`🎯 D3 range (140-155Hz): ${dPeaks.map(p => `${Math.round(p.frequency)}Hz (${p.magnitude.toFixed(1)}dB, boosted: ${p.boostedMagnitude.toFixed(1)}dB)`).join(', ')}`);
+                if (lowPeaks.length > 0) {
+                    const usedSpecialThreshold = lowPeaks.some(p => p.magnitude < -60 && p.magnitude >= -75);
+                    console.log(`🎯 Low range (140-170Hz, D3/D#3/E3): ${lowPeaks.map(p => `${Math.round(p.frequency)}Hz (${p.magnitude.toFixed(1)}dB, boosted: ${p.boostedMagnitude.toFixed(1)}dB)`).join(', ')}${usedSpecialThreshold ? ' ⚡ SPECIAL -75dB THRESHOLD USED' : ''}`);
                 }
                 if (dOctavePeaks.length > 0) {
                     console.log(`🎯 D4 octave range (285-302Hz): ${dOctavePeaks.map(p => `${Math.round(p.frequency)}Hz (${p.magnitude.toFixed(1)}dB, boosted: ${p.boostedMagnitude.toFixed(1)}dB)`).join(', ')}`);
                 }
                 
-                // Check if D4 is stronger than D3 (problematic case)
-                if (dPeaks.length > 0 && dOctavePeaks.length > 0) {
-                    const d3Mag = dPeaks[0].magnitude;
+                // Check if D4 is stronger than low fundamentals (problematic case)
+                if (lowPeaks.length > 0 && dOctavePeaks.length > 0) {
+                    const lowMag = lowPeaks[0].magnitude;
                     const d4Mag = dOctavePeaks[0].magnitude;
-                    const diff = d4Mag - d3Mag;
+                    const diff = d4Mag - lowMag;
                     if (diff > 5) {
-                        console.log(`⚠️ WARNING: D4 octave is ${diff.toFixed(1)}dB stronger than D3 fundamental! This may cause detection issues.`);
+                        console.log(`⚠️ WARNING: D4 octave (${Math.round(dOctavePeaks[0].frequency)}Hz) is ${diff.toFixed(1)}dB stronger than fundamental (${Math.round(lowPeaks[0].frequency)}Hz)! This may cause detection issues.`);
                     }
                 }
             }
@@ -3205,6 +4135,7 @@
                         if (diff < harmonicTolerance) {
                             isHarmonic = true;
                             harmonicOf = { freq: fundamental.frequency, multiple: multiple };
+                            console.log(`  🔍 ${Math.round(peak.frequency)}Hz detected as ${multiple}x harmonic of ${Math.round(fundamental.frequency)}Hz (diff: ${(diff * 100).toFixed(2)}%)`);
                             break;
                         }
                     }
@@ -3212,51 +4143,79 @@
                     if (isHarmonic) break;
                 }
                 
+                if (!isHarmonic && peak.frequency > 300) {
+                    console.log(`  🔍 ${Math.round(peak.frequency)}Hz NOT detected as harmonic (fundamentals in list: ${fundamentals.map(f => Math.round(f.frequency) + 'Hz').join(', ')})`);
+                }
+                
                 // MAGNITUDE FILTER: If harmonic AND weak, filter it
                 if (isHarmonic && harmonicOf) {
                     // Use BOOSTED magnitude to better detect when harmonics are stronger than fundamentals
                     const magnitudeDiff = maxBoostedMagnitude - peak.boostedMagnitude;
                     
-                    if (magnitudeDiff > magnitudeThreshold) {
+                    // Harmonique 3x (tierce) est particulièrement forte sur guitare - seuil TRÈS strict
+                    // Harmonique 5x est aussi souvent forte - seuil strict aussi
+                    let effectiveThreshold = magnitudeThreshold;
+                    if (harmonicOf.multiple === 3) {
+                        effectiveThreshold = 10; // Très strict pour 3x
+                    } else if (harmonicOf.multiple === 5) {
+                        effectiveThreshold = magnitudeThreshold - 2; // Un peu plus strict pour 5x
+                    }
+                    
+                    if (magnitudeDiff > effectiveThreshold) {
                         // Weak harmonic - filter it
-                        console.log(`  ❌ ${Math.round(peak.frequency)}Hz filtered (weak harmonic ${harmonicOf.multiple}x of ${Math.round(harmonicOf.freq)}Hz, ${magnitudeDiff.toFixed(1)}dB below max boosted)`);
+                        console.log(`  ❌ ${Math.round(peak.frequency)}Hz filtered (weak harmonic ${harmonicOf.multiple}x of ${Math.round(harmonicOf.freq)}Hz, ${magnitudeDiff.toFixed(1)}dB below max boosted, threshold: ${effectiveThreshold}dB)`);
                         continue; // Skip this peak
                     } else {
                         // Strong harmonic - might be a real note, keep it
-                        console.log(`  ⚠️ ${Math.round(peak.frequency)}Hz kept despite being harmonic ${harmonicOf.multiple}x (strong: only ${magnitudeDiff.toFixed(1)}dB below max boosted)`);
+                        console.log(`  ⚠️ ${Math.round(peak.frequency)}Hz kept despite being harmonic ${harmonicOf.multiple}x (strong: only ${magnitudeDiff.toFixed(1)}dB below max boosted, threshold: ${effectiveThreshold}dB)`);
                     }
                 }
                 
-                // Add if it's fundamental OR octave OR strong harmonic
-                if (!isHarmonic || (isHarmonic && (maxBoostedMagnitude - peak.boostedMagnitude) <= magnitudeThreshold)) {
-                    fundamentals.push(peak);
-                    
-                    // Check if this is an octave of a lower fundamental
-                    let isOctave = false;
-                    let octaveOfFundamental = null;
-                    for (let j = 0; j < fundamentals.length - 1; j++) {
+                // If we reach here, the peak passed all filters - add it
+                // BEFORE adding, check if this is a dominant octave that should be filtered
+                let isDominantOctave = false;
+                    for (let j = 0; j < fundamentals.length; j++) {
                         const lower = fundamentals[j];
                         const expectedOctave = lower.frequency * 2;
                         const diff = Math.abs(peak.frequency - expectedOctave) / expectedOctave;
                         if (diff < harmonicTolerance) {
-                            isOctave = true;
-                            octaveOfFundamental = lower;
-                            
-                            // SPECIAL CHECK: If octave is MUCH stronger than fundamental, it might be the real note
+                            // This is an octave
                             const octaveStronger = peak.magnitude - lower.magnitude;
-                            if (octaveStronger > 10) {
-                                console.log(`  ⚠️ OCTAVE DOMINANCE: ${Math.round(peak.frequency)}Hz is ${octaveStronger.toFixed(1)}dB stronger than fundamental ${Math.round(lower.frequency)}Hz - might be primary note!`);
-                            } else {
-                                console.log(`  ✅ ${Math.round(peak.frequency)}Hz kept (octave of ${Math.round(lower.frequency)}Hz, +${octaveStronger.toFixed(1)}dB)`);
+                            if (octaveStronger > 15) {
+                                // Octave is MUCH stronger - don't add it, keep the fundamental
+                                console.log(`  ❌ OCTAVE FILTERED: ${Math.round(peak.frequency)}Hz is ${octaveStronger.toFixed(1)}dB stronger than fundamental ${Math.round(lower.frequency)}Hz - removing octave to keep fundamental`);
+                                isDominantOctave = true;
+                                break;
                             }
-                            break;
                         }
                     }
                     
-                    if (!isOctave) {
-                        console.log(`  ✅ ${Math.round(peak.frequency)}Hz kept (fundamental, ${peak.magnitude.toFixed(1)}dB, boosted: ${peak.boostedMagnitude.toFixed(1)}dB)`);
+                    // Only add if not a dominant octave
+                    if (!isDominantOctave) {
+                        fundamentals.push(peak);
+                        
+                        // Check if this is an octave of a lower fundamental (for logging)
+                        let isOctave = false;
+                        for (let j = 0; j < fundamentals.length - 1; j++) {
+                            const lower = fundamentals[j];
+                            const expectedOctave = lower.frequency * 2;
+                            const diff = Math.abs(peak.frequency - expectedOctave) / expectedOctave;
+                            if (diff < harmonicTolerance) {
+                                isOctave = true;
+                                const octaveStronger = peak.magnitude - lower.magnitude;
+                                if (octaveStronger > 10) {
+                                    console.log(`  ⚠️ OCTAVE DOMINANCE: ${Math.round(peak.frequency)}Hz is ${octaveStronger.toFixed(1)}dB stronger than fundamental ${Math.round(lower.frequency)}Hz - keeping both`);
+                                } else {
+                                    console.log(`  ✅ ${Math.round(peak.frequency)}Hz kept (octave of ${Math.round(lower.frequency)}Hz, +${octaveStronger.toFixed(1)}dB)`);
+                                }
+                                break;
+                            }
+                        }
+                        
+                        if (!isOctave) {
+                            console.log(`  ✅ ${Math.round(peak.frequency)}Hz kept (fundamental, ${peak.magnitude.toFixed(1)}dB, boosted: ${peak.boostedMagnitude.toFixed(1)}dB)`);
+                        }
                     }
-                }
             }
             
             // Convert frequencies to notes
@@ -3278,7 +4237,22 @@
                 }
             });
             
-            const finalNotes = Object.keys(uniqueNotes);
+            // FILTER: Keep only the N strongest notes (to ignore sympathetic strings)
+            const maxNotesLimit = parseInt(maxNotesDetectedSelect?.value || 0);
+            let filteredNotes = Object.values(uniqueNotes);
+            
+            if (maxNotesLimit > 0 && filteredNotes.length > maxNotesLimit) {
+                // Sort by magnitude (strongest first)
+                filteredNotes.sort((a, b) => b.magnitude - a.magnitude);
+                
+                // Keep only top N
+                const removed = filteredNotes.slice(maxNotesLimit);
+                filteredNotes = filteredNotes.slice(0, maxNotesLimit);
+                
+                console.log(`🔇 Filtered out weak notes (keeping ${maxNotesLimit} strongest): ${removed.map(n => `${n.note} (${n.magnitude.toFixed(1)}dB)`).join(', ')}`);
+            }
+            
+            const finalNotes = filteredNotes.map(n => n.note);
             
             // Debug: Log final result
             if (finalNotes.length > 0) {
@@ -3413,6 +4387,31 @@
             const halfStepsFromC4 = noteIndex;
             return C4 * Math.pow(2, halfStepsFromC4 / 12);
         }
+        
+        // NEW: Convert note with octave (e.g., "E4", "D3") to frequency
+        function noteWithOctaveToFrequency(noteNameWithOctave) {
+            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            
+            // Parse note name and octave (e.g., "E4" -> "E", 4)
+            const noteName = noteNameWithOctave.slice(0, -1);
+            const octave = parseInt(noteNameWithOctave.slice(-1));
+            
+            if (isNaN(octave)) return null;
+            
+            const noteIndex = noteNames.indexOf(noteName);
+            if (noteIndex === -1) return null;
+            
+            // Calculate frequency: A4 = 440 Hz as reference
+            // Distance from A4 in semitones
+            const A4Index = 9; // A is index 9 in noteNames
+            const A4Octave = 4;
+            
+            const semitonesFromA4 = (octave - A4Octave) * 12 + (noteIndex - A4Index);
+            const frequency = 440 * Math.pow(2, semitonesFromA4 / 12);
+            
+            return frequency;
+        }
+
 
         function playNote(noteName, duration = 2000) {
             if (!playSoundCheckbox.checked) return;
@@ -3936,6 +4935,1710 @@
                 speedModeCorrectCount++;
                 speedModeScore.textContent = speedModeCorrectCount;
             }
+        }
+
+        // Debug mode functions
+        function resetDebugMode() {
+            console.log('🔬 Debug mode reset called');
+            debugCaptureStartTime = 0;
+            debugCaptureScheduled = false;
+            debugFrozenFFT = null;
+            waveformZoom = 1;
+            waveformZoomY = 1;
+            waveformOffset = 0;
+            waveformOffsetY = 0;
+            
+            if (zoomLevel) zoomLevel.textContent = '1×';
+            if (zoomYLevel) zoomYLevel.textContent = '1×';
+            
+            if (debugStatus) {
+                debugStatus.textContent = '🎤 En attente d\'un signal...';
+                debugStatus.style.color = 'var(--text-secondary)';
+            }
+            
+            if (debugStats) debugStats.style.display = 'none';
+            if (debugPeakList) debugPeakList.style.display = 'none';
+            
+            // Clear waveform canvas
+            if (debugWaveformCanvas) {
+                const ctx = debugWaveformCanvas.getContext('2d');
+                ctx.fillStyle = '#0a0e14';
+                ctx.fillRect(0, 0, debugWaveformCanvas.width, debugWaveformCanvas.height);
+            }
+            
+            // Clear spectrum canvas
+            if (debugSpectrumCanvas) {
+                const ctx = debugSpectrumCanvas.getContext('2d');
+                ctx.fillStyle = '#0a0e14';
+                ctx.fillRect(0, 0, debugSpectrumCanvas.width, debugSpectrumCanvas.height);
+                console.log('🔬 Canvas cleared');
+            } else {
+                console.error('❌ debugSpectrumCanvas not found!');
+            }
+        }
+        
+        function captureDebugFFT(fftData, timeDomainData) {
+            console.log('🔬 captureDebugFFT called', fftData);
+            
+            // Compute FFT on the captured time domain data
+            if (timeDomainData) {
+                console.log(`🔬 Computing FFT on ${timeDomainData.length} samples...`);
+                
+                computeFFTFromWindow(timeDomainData, 0, timeDomainData.length).then(windowFFT => {
+                    debugFrozenFFT = {
+                        dataArray: windowFFT.dataArray,
+                        bufferLength: windowFFT.bufferLength,
+                        sampleRate: windowFFT.sampleRate,
+                        nyquist: windowFFT.nyquist,
+                        timeDomain: new Float32Array(timeDomainData)
+                    };
+                    
+                    if (debugStatus) {
+                        debugStatus.textContent = '✅ Spectre capturé !';
+                        debugStatus.style.color = 'var(--success)';
+                    }
+                    
+                    // Draw waveform first
+                    console.log('🔬 Drawing waveform...');
+                    drawDebugWaveform(timeDomainData);
+                    
+                    // Draw spectrum
+                    console.log('🔬 Drawing spectrum...');
+                    drawDebugSpectrum(debugFrozenFFT);
+                    
+                    // Analyze and display stats
+                    console.log('🔬 Analyzing FFT...');
+                    analyzeDebugFFT(debugFrozenFFT);
+                }).catch(error => {
+                    console.error('❌ Error computing FFT:', error);
+                });
+            } else {
+                // Fallback to original FFT data
+                debugFrozenFFT = {
+                    dataArray: new Float32Array(fftData.dataArray),
+                    bufferLength: fftData.bufferLength,
+                    sampleRate: fftData.sampleRate,
+                    nyquist: fftData.nyquist,
+                    timeDomain: null
+                };
+                
+                if (debugStatus) {
+                    debugStatus.textContent = '✅ Spectre capturé !';
+                    debugStatus.style.color = 'var(--success)';
+                }
+                
+                drawDebugSpectrum(debugFrozenFFT);
+                analyzeDebugFFT(debugFrozenFFT);
+            }
+        }
+        
+        function drawDebugWaveform(timeDomainData) {
+            const canvas = debugWaveformCanvas;
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Clear canvas
+            ctx.fillStyle = '#0a0e14';
+            ctx.fillRect(0, 0, width, height);
+            
+            // Draw center line (zero)
+            ctx.strokeStyle = '#30363d';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, height / 2);
+            ctx.lineTo(width, height / 2);
+            ctx.stroke();
+            
+            // Draw waveform with zoom and offset
+            ctx.strokeStyle = '#00d4aa';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            const bufferLength = timeDomainData.length;
+            
+            // Calculate visible range based on zoom and offset (X axis - time)
+            const samplesPerPixel = bufferLength / width / waveformZoom;
+            const centerSample = bufferLength / 2 + waveformOffset;
+            const startSample = Math.max(0, Math.floor(centerSample - (width / 2) * samplesPerPixel));
+            const endSample = Math.min(bufferLength, Math.ceil(centerSample + (width / 2) * samplesPerPixel));
+            
+            const visibleSamples = endSample - startSample;
+            const sliceWidth = width / visibleSamples;
+            let x = 0;
+            
+            // Y axis scaling and offset
+            const amplitudeScale = waveformZoomY;
+            const amplitudeCenter = waveformOffsetY;
+            
+            for (let i = startSample; i < endSample; i++) {
+                const v = timeDomainData[i];
+                // Apply Y zoom and offset
+                const scaledV = (v - amplitudeCenter) * amplitudeScale + amplitudeCenter;
+                const y = (scaledV + 1) * height / 2;
+                
+                if (i === startSample) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+                
+                x += sliceWidth;
+            }
+            
+            ctx.stroke();
+            
+            // Draw amplitude labels (adjusted for Y zoom)
+            ctx.fillStyle = '#8b949e';
+            ctx.font = '10px JetBrains Mono';
+            const maxAmplitude = 1.0 / amplitudeScale;
+            const centerAmplitude = amplitudeCenter;
+            ctx.fillText(`+${maxAmplitude.toFixed(2)}`, 5, 15);
+            ctx.fillText(`${centerAmplitude.toFixed(2)}`, 5, height / 2 - 5);
+            ctx.fillText(`-${maxAmplitude.toFixed(2)}`, 5, height - 5);
+            
+            // Draw time scale (visible duration)
+            const visibleDuration = visibleSamples / 44100;
+            ctx.fillText(`${(visibleDuration * 1000).toFixed(1)}ms`, width - 60, height - 5);
+            
+            // Draw sample position info
+            const sampleRate = 44100;
+            const startTime = (startSample / sampleRate * 1000).toFixed(1);
+            const endTime = (endSample / sampleRate * 1000).toFixed(1);
+            ctx.fillText(`${startTime}-${endTime}ms`, width / 2 - 40, 15);
+        }
+        
+        function computeFFTFromWindow(timeDomainData, startSample, endSample) {
+            // Extract the visible window
+            const windowLength = endSample - startSample;
+            const windowData = timeDomainData.slice(startSample, endSample);
+            
+            // Pad to next power of 2 for FFT
+            const fftSize = Math.pow(2, Math.ceil(Math.log2(windowLength)));
+            const paddedData = new Float32Array(fftSize);
+            
+            // Copy data and apply Hann window to reduce spectral leakage
+            for (let i = 0; i < windowLength; i++) {
+                const hannWindow = 0.5 * (1 - Math.cos(2 * Math.PI * i / (windowLength - 1)));
+                paddedData[i] = windowData[i] * hannWindow;
+            }
+            
+            // Create offline audio context for FFT computation
+            const offlineCtx = new OfflineAudioContext(1, fftSize, 44100);
+            const buffer = offlineCtx.createBuffer(1, fftSize, 44100);
+            buffer.getChannelData(0).set(paddedData);
+            
+            const source = offlineCtx.createBufferSource();
+            source.buffer = buffer;
+            
+            const analyser = offlineCtx.createAnalyser();
+            analyser.fftSize = fftSize;
+            analyser.smoothingTimeConstant = 0;
+            
+            source.connect(analyser);
+            source.start(0);
+            
+            // Get frequency data
+            const frequencyData = new Float32Array(analyser.frequencyBinCount);
+            
+            // We need to render to get the analysis
+            return offlineCtx.startRendering().then(() => {
+                analyser.getFloatFrequencyData(frequencyData);
+                
+                return {
+                    dataArray: frequencyData,
+                    bufferLength: analyser.frequencyBinCount,
+                    sampleRate: 44100,
+                    nyquist: 22050,
+                    fftSize: fftSize,
+                    windowDuration: windowLength / 44100
+                };
+            });
+        }
+        
+        function drawDebugSpectrum(fftData) {
+            const canvas = debugSpectrumCanvas;
+            const ctx = canvas.getContext('2d');
+            const { dataArray, bufferLength, nyquist } = fftData;
+            
+            // Clear canvas
+            ctx.fillStyle = '#0a0e14';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = '#30363d';
+            ctx.lineWidth = 1;
+            
+            // Horizontal grid lines (dB levels)
+            const dbLevels = [-80, -60, -40, -20, 0];
+            dbLevels.forEach(db => {
+                const y = canvas.height - ((db + 100) / 100) * canvas.height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+                
+                // Label
+                ctx.fillStyle = '#8b949e';
+                ctx.font = '10px JetBrains Mono';
+                ctx.fillText(`${db}dB`, 5, y - 2);
+            });
+            
+            // Draw spectrum
+            ctx.strokeStyle = '#00d4aa';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            const minFreq = 40;
+            const maxFreq = 1000;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const frequency = (i * nyquist) / bufferLength;
+                
+                if (frequency >= minFreq && frequency <= maxFreq) {
+                    const x = ((frequency - minFreq) / (maxFreq - minFreq)) * canvas.width;
+                    const magnitude = dataArray[i];
+                    const y = canvas.height - ((magnitude + 100) / 100) * canvas.height;
+                    
+                    if (i === 0 || frequency <= minFreq) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+            }
+            
+            ctx.stroke();
+            
+            // Draw frequency labels
+            const freqLabels = [50, 100, 150, 200, 250, 300, 400, 500, 750, 1000];
+            ctx.fillStyle = '#8b949e';
+            ctx.font = '10px JetBrains Mono';
+            freqLabels.forEach(freq => {
+                const x = ((freq - minFreq) / (maxFreq - minFreq)) * canvas.width;
+                ctx.fillText(`${freq}Hz`, x - 15, canvas.height - 5);
+            });
+        }
+        
+        // Helper function to get note name for a string/fret combination
+        function getStringNote(string, fret) {
+            const openStrings = {
+                1: 'E4',  // 329.63 Hz
+                2: 'B3',  // 246.94 Hz
+                3: 'G3',  // 196.00 Hz
+                4: 'D3',  // 146.83 Hz
+                5: 'A2',  // 110.00 Hz
+                6: 'E2'   // 82.41 Hz
+            };
+            
+            const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const openNote = openStrings[string];
+            
+            // Parse the open note (e.g., "E4" -> note: E, octave: 4)
+            const openNoteName = openNote.slice(0, -1);
+            let openOctave = parseInt(openNote.slice(-1));
+            
+            // Find index of open note
+            let noteIndex = notes.indexOf(openNoteName);
+            
+            // Add frets
+            noteIndex += fret;
+            
+            // Handle octave changes
+            while (noteIndex >= 12) {
+                noteIndex -= 12;
+                openOctave++;
+            }
+            
+            return notes[noteIndex] + openOctave;
+        }
+        
+        function analyzeDebugFFT(fftData) {
+            const { dataArray, bufferLength, nyquist, sampleRate } = fftData;
+            const minDb = parseInt(detectionSensitivityInput?.value || -60);
+            
+            // Find all peaks
+            const peaks = [];
+            for (let i = 2; i < bufferLength - 2; i++) {
+                const frequency = (i * nyquist) / bufferLength;
+                
+                // SPECIAL CASE: D/D#/E string fundamentals (140-170 Hz) get lower threshold
+                let dynamicMinDb = minDb;
+                if (frequency >= 140 && frequency <= 170) {
+                    dynamicMinDb = Math.min(minDb, -75); // Accept down to -75 dB for D3/D#3/E3 range
+                }
+                
+                if (dataArray[i] > dynamicMinDb) {
+                    if (dataArray[i] > dataArray[i-1] && 
+                        dataArray[i] > dataArray[i-2] &&
+                        dataArray[i] > dataArray[i+1] && 
+                        dataArray[i] > dataArray[i+2]) {
+                        
+                        if (frequency >= 40 && frequency <= 1000) {
+                            peaks.push({
+                                frequency: frequency,
+                                magnitude: dataArray[i]
+                            });
+                        }
+                    }
+                }
+            }
+            
+            // Sort by frequency (low to high) for chronological/harmonic analysis
+            // This shows the fundamental first, then harmonics in order
+            peaks.sort((a, b) => a.frequency - b.frequency);
+            
+            // FILTER PARASITIC PEAKS IN BOOSTED ZONES
+            // In zones where we apply special boost (like 140-170 Hz for D string),
+            // keep only the strongest peak to avoid detecting noise as multiple notes
+            const boostedZones = [
+                { min: 140, max: 170, name: 'D3/D#3/E3 zone' }
+                // Add more zones here if needed
+            ];
+            
+            const filteredPeaks = [];
+            const peaksToSkip = new Set();
+            
+            boostedZones.forEach(zone => {
+                const peaksInZone = peaks.filter(p => 
+                    p.frequency >= zone.min && 
+                    p.frequency <= zone.max &&
+                    !peaksToSkip.has(p)
+                );
+                
+                if (peaksInZone.length > 1) {
+                    // Sort by magnitude (strongest first)
+                    peaksInZone.sort((a, b) => b.magnitude - a.magnitude);
+                    
+                    // Keep only the strongest
+                    const strongest = peaksInZone[0];
+                    console.log(`🔧 Boosted zone ${zone.name} (${zone.min}-${zone.max} Hz): ${peaksInZone.length} peaks found`);
+                    console.log(`   → Keeping strongest: ${strongest.frequency.toFixed(1)} Hz @ ${strongest.magnitude.toFixed(1)} dB`);
+                    
+                    // Mark others for removal
+                    for (let i = 1; i < peaksInZone.length; i++) {
+                        peaksToSkip.add(peaksInZone[i]);
+                        console.log(`   → Removing parasite: ${peaksInZone[i].frequency.toFixed(1)} Hz @ ${peaksInZone[i].magnitude.toFixed(1)} dB`);
+                    }
+                }
+            });
+            
+            // Build final filtered list
+            peaks.forEach(p => {
+                if (!peaksToSkip.has(p)) {
+                    filteredPeaks.push(p);
+                }
+            });
+            
+            // Replace peaks with filtered version
+            const originalPeakCount = peaks.length;
+            peaks.length = 0;
+            peaks.push(...filteredPeaks);
+            
+            if (originalPeakCount !== peaks.length) {
+                console.log(`🔧 Filtered ${originalPeakCount - peaks.length} parasitic peak(s) from boosted zones`);
+            }
+            
+            // Update stats - find max magnitude for stats display
+            const maxMagnitudePeak = peaks.reduce((max, p) => p.magnitude > max.magnitude ? p : max, peaks[0] || {magnitude: 0, frequency: 0});
+            
+            const resolution = sampleRate / (bufferLength * 2);
+            debugResolution.textContent = `${resolution.toFixed(2)} Hz/bin`;
+            debugPeakCount.textContent = peaks.length;
+            
+            if (peaks.length > 0) {
+                debugMaxPeak.textContent = `${Math.round(maxMagnitudePeak.frequency)} Hz`;
+                debugMaxMagnitude.textContent = `${maxMagnitudePeak.magnitude.toFixed(1)} dB`;
+            } else {
+                debugMaxPeak.textContent = '—';
+                debugMaxMagnitude.textContent = '—';
+            }
+            
+            // Show stats
+            debugStats.style.display = 'block';
+            
+            // Display peak list with harmonic detection
+            if (peaks.length > 0) {
+                const peakListHTML = peaks.slice(0, 30).map((peak, i) => {
+                    const note = frequencyToNote(peak.frequency);
+                    let harmonicInfo = '';
+                    let bestMatch = null;
+                    let bestRatio = Infinity;
+                    
+                    // Check if this peak is a harmonic of a previous (lower) peak
+                    // Find the SIMPLEST harmonic relationship (lowest multiplier)
+                    for (let j = 0; j < i; j++) {
+                        const lowerPeak = peaks[j];
+                        const ratio = peak.frequency / lowerPeak.frequency;
+                        
+                        // Check for common harmonic relationships (2x, 3x, 4x, etc.)
+                        for (let mult = 2; mult <= 10; mult++) {
+                            if (Math.abs(ratio - mult) < 0.05) { // 5% tolerance
+                                // Keep only the simplest relationship (smallest multiplier)
+                                if (mult < bestRatio) {
+                                    bestRatio = mult;
+                                    bestMatch = {
+                                        mult: mult,
+                                        freq: lowerPeak.frequency,
+                                        note: frequencyToNote(lowerPeak.frequency)
+                                    };
+                                }
+                                break; // Found a match for this peak, check next lowerPeak
+                            }
+                        }
+                    }
+                    
+                    if (bestMatch) {
+                        harmonicInfo = ` <span style="color: var(--accent-warning);">[${bestMatch.mult}× de ${Math.round(bestMatch.freq)}Hz ${bestMatch.note}]</span>`;
+                    }
+                    
+                    // Mark if this is low range (D/D#/E) and used special threshold
+                    const isLowRange = peak.frequency >= 140 && peak.frequency <= 170;
+                    const usedSpecialThreshold = isLowRange && peak.magnitude < -60 && peak.magnitude >= -75;
+                    const lowRangeMarker = usedSpecialThreshold ? ' <span style="color: var(--accent-success);">⚡-75dB</span>' : '';
+                    
+                    return `${(i+1).toString().padStart(2, ' ')}. ${Math.round(peak.frequency).toString().padEnd(4, ' ')} Hz → ${peak.magnitude.toFixed(1).padStart(6, ' ')} dB → <strong>${note || '?'}</strong>${harmonicInfo}${lowRangeMarker}`;
+                }).join('<br>');
+                
+                // Ne PAS afficher tout de suite - on affichera dans le bon ordre à la fin
+                // debugPeakListContent.innerHTML = peakListHTML;
+                let storedPeakListHTML = peakListHTML; // Stocker pour affichage ultérieur
+                debugPeakList.style.display = 'block';
+                
+                // FRETBOARD POSITION DETECTION: Map detected notes to fret positions
+                // STRATEGY: For EACH of the 6 strings, find the best matching peak
+                // Assumes all strings are played (or at least try to find them)
+                
+                console.log(`🎼 Total peaks available: ${peaks.length}`);
+                console.log(`🎼 Peak frequencies: ${peaks.slice(0, 15).map(p => `${p.frequency.toFixed(1)}Hz@${p.magnitude.toFixed(1)}dB`).join(', ')}`);
+                
+                
+                const fretboardPositions = [];
+                let lastAssignedFret = null;
+                
+                // NEW ALGORITHM: Classify peaks as FUNDAMENTAL or HARMONIC, then assign sequentially
+                console.log(`\n🎸 Classification and sequential assignment:`);
+                
+                let currentStringIndex = 6; // Start from bass (string 6)
+                
+                // STEP 1: Classify each peak as FUNDAMENTAL or HARMONIC
+                console.log(`\n📊 Step 1: Classifying peaks...`);
+                const classifiedPeaks = peaks.map((peak, index) => {
+                    // Check if this peak is a harmonic (2×, 3×, 4×, 5×, 6×) of any previous peak
+                    let isFundamental = true;
+                    let harmonicOf = null;
+                    let harmonicMultiple = null;
+                    
+                    for (let i = 0; i < index; i++) {
+                        const prevPeak = peaks[i];
+                        for (let mult = 2; mult <= 6; mult++) {
+                            const expectedHarmonic = prevPeak.frequency * mult;
+                            const tolerance = expectedHarmonic * 0.02; // 2% tolerance
+                            
+                            if (Math.abs(peak.frequency - expectedHarmonic) < tolerance) {
+                                isFundamental = false;
+                                harmonicOf = prevPeak.frequency;
+                                harmonicMultiple = mult;
+                                break;
+                            }
+                        }
+                        if (!isFundamental) break;
+                    }
+                    
+                    const classification = isFundamental ? 'FUNDAMENTAL' : 'HARMONIC';
+                    const detail = isFundamental ? '' : ` (${harmonicMultiple}× of ${harmonicOf.toFixed(1)}Hz)`;
+                    console.log(`  ${peak.frequency.toFixed(1)}Hz @ ${peak.magnitude.toFixed(1)}dB → ${classification}${detail}`);
+                    
+                    return {
+                        ...peak,
+                        isFundamental,
+                        harmonicOf,
+                        harmonicMultiple
+                    };
+                });
+                
+                // STEP 2: Process peaks sequentially from bass to treble
+                console.log(`\n🎸 Step 2: Assigning peaks to strings...`);
+                
+                for (const peak of classifiedPeaks) {
+                    if (currentStringIndex < 1) {
+                        console.log(`\n✅ All 6 strings assigned, stopping.`);
+                        break; // All strings assigned
+                    }
+                    
+                    console.log(`\n🎵 Processing ${peak.frequency.toFixed(1)}Hz (${peak.isFundamental ? 'FUNDAMENTAL' : 'HARMONIC'}):`);
+                    
+                    // Get the frequency range for current string
+                    const openNote = getStringNote(currentStringIndex, 0);
+                    const maxFretNote = getStringNote(currentStringIndex, 12);
+                    const minFreq = noteWithOctaveToFrequency(openNote);
+                    const maxFreq = noteWithOctaveToFrequency(maxFretNote);
+                    const tolerance = 3.0; // Hz
+                    
+                    // Check if peak is in range for this string
+                    if (peak.frequency < (minFreq - tolerance) || peak.frequency > (maxFreq + tolerance)) {
+                        console.log(`  ⏭️ Out of range for String ${currentStringIndex} (${minFreq.toFixed(1)}-${maxFreq.toFixed(1)}Hz)`);
+                        continue; // Skip this peak, try next one
+                    }
+                    
+                    console.log(`  ✅ In range for String ${currentStringIndex} (${minFreq.toFixed(1)}-${maxFreq.toFixed(1)}Hz)`);
+                    
+                    // Find which fret this peak matches
+                    let bestMatch = null;
+                    let bestDiff = Infinity;
+                    
+                    for (let fret = 0; fret <= 12; fret++) {
+                        const fretNote = getStringNote(currentStringIndex, fret);
+                        const fretFreq = noteWithOctaveToFrequency(fretNote);
+                        const freqDiff = Math.abs(peak.frequency - fretFreq);
+                        const freqTolerance = fretFreq * 0.03; // 3% tolerance
+                        
+                        if (freqDiff < freqTolerance && freqDiff < bestDiff) {
+                            bestDiff = freqDiff;
+                            bestMatch = {
+                                fret: fret,
+                                note: fretNote,
+                                theoreticalFreq: fretFreq,
+                                freqDiff: freqDiff,
+                                cents: 1200 * Math.log2(peak.frequency / fretFreq)
+                            };
+                        }
+                    }
+                    
+                    if (!bestMatch) {
+                        console.log(`  ❌ No valid fret match`);
+                        continue;
+                    }
+                    
+                    // Check GLOBAL SPAN constraint (max 4 frets between lowest and highest finger)
+                    if (fretboardPositions.length > 0) {
+                        const currentFrets = fretboardPositions.map(p => p.fret);
+                        const minFret = Math.min(...currentFrets);
+                        const maxFret = Math.max(...currentFrets);
+                        
+                        // Calculate what the span would be if we add this new fret
+                        const newSpan = Math.max(maxFret, bestMatch.fret) - Math.min(minFret, bestMatch.fret);
+                        
+                        if (newSpan > 4) {
+                            console.log(`  ⚠️ Adding fret ${bestMatch.fret} would create span ${newSpan} > 4 (current: ${minFret}-${maxFret})`);
+                            continue; // Skip this peak - would create impossible hand position
+                        }
+                        console.log(`  ✅ Fret ${bestMatch.fret} maintains span ≤ 4 (current: ${minFret}-${maxFret}, new: ${Math.min(minFret, bestMatch.fret)}-${Math.max(maxFret, bestMatch.fret)})`);
+                    }
+                    
+                    // DECISION LOGIC:
+                    if (peak.isFundamental) {
+                        // FUNDAMENTAL → Assign directly
+                        const fretDisplay = bestMatch.fret === 0 ? 'À vide' : `Frette ${bestMatch.fret}`;
+                        console.log(`  ✅ FUNDAMENTAL → Assigning to String ${currentStringIndex}: ${fretDisplay} = ${bestMatch.note}`);
+                        
+                        fretboardPositions.push({
+                            string: currentStringIndex,
+                            fret: bestMatch.fret,
+                            note: bestMatch.note,
+                            frequency: bestMatch.theoreticalFreq,
+                            detectedFreq: peak.frequency,
+                            diff: bestMatch.freqDiff,
+                            cents: bestMatch.cents,
+                            magnitude: peak.magnitude
+                        });
+                        
+                        lastAssignedFret = bestMatch.fret;
+                        currentStringIndex--; // Move to next string
+                        
+                    } else {
+                        // HARMONIC → Apply filter from v4.45.0
+                        console.log(`  🔍 HARMONIC → Checking if it's a real played note...`);
+                        
+                        // Check if this harmonic has its own harmonics (2× and 3×)
+                        const harmonic2x = peak.frequency * 2;
+                        const harmonic3x = peak.frequency * 3;
+                        
+                        const has2x = peaks.find(p => Math.abs(p.frequency - harmonic2x) < harmonic2x * 0.02);
+                        const has3x = peaks.find(p => Math.abs(p.frequency - harmonic3x) < harmonic3x * 0.02);
+                        
+                        let harmonicScore = 0;
+                        if (has2x) {
+                            harmonicScore += 2;
+                            console.log(`    Has 2× harmonic at ${has2x.frequency.toFixed(1)}Hz → score +2`);
+                        }
+                        if (has3x) {
+                            harmonicScore += 1;
+                            console.log(`    Has 3× harmonic at ${has3x.frequency.toFixed(1)}Hz → score +1`);
+                        }
+                        
+                        // Decision: assign if harmonic score >= 2 (has at least 2× harmonic)
+                        if (harmonicScore >= 2) {
+                            const fretDisplay = bestMatch.fret === 0 ? 'À vide' : `Frette ${bestMatch.fret}`;
+                            console.log(`  ✅ HARMONIC with strong harmonics (score ${harmonicScore}) → Assigning to String ${currentStringIndex}: ${fretDisplay} = ${bestMatch.note}`);
+                            
+                            fretboardPositions.push({
+                                string: currentStringIndex,
+                                fret: bestMatch.fret,
+                                note: bestMatch.note,
+                                frequency: bestMatch.theoreticalFreq,
+                                detectedFreq: peak.frequency,
+                                diff: bestMatch.freqDiff,
+                                cents: bestMatch.cents,
+                                magnitude: peak.magnitude
+                            });
+                            
+                            lastAssignedFret = bestMatch.fret;
+                            currentStringIndex--; // Move to next string
+                        } else {
+                            console.log(`  ⏭️ HARMONIC with weak harmonics (score ${harmonicScore}) → Skipping (likely parasitic)`);
+                        }
+                    }
+                }
+                
+                console.log(`\n🎼 Total positions found: ${fretboardPositions.length}/6`);
+                
+                // ============================================================
+                // STRUCTURATION DE LA DÉTECTION (Option A - Bases solides)
+                // ============================================================
+                
+                console.log(`\n📊 Structuring detection results...`);
+                
+                // 1. EXTRAIRE LES NOTES UNIQUES (sans octave)
+                function extraireNotesUniques(positions) {
+                    // IMPORTANT: Garder l'ordre des fréquences (grave → aigu), pas alphabétique !
+                    // Trier d'abord les positions par fréquence
+                    const positionsSorted = [...positions].sort((a, b) => a.frequency - b.frequency);
+                    
+                    const notesUniques = [];
+                    const notesSeen = new Set();
+                    
+                    positionsSorted.forEach(pos => {
+                        // Enlever le chiffre d'octave (ex: "D3" → "D")
+                        const noteBase = pos.note.replace(/[0-9]/g, '');
+                        if (!notesSeen.has(noteBase)) {
+                            notesUniques.push(noteBase);
+                            notesSeen.add(noteBase);
+                        }
+                    });
+                    
+                    return notesUniques; // Ordre: grave → aigu
+                }
+                
+                // 2. CALCULER LA ZONE DU MANCHE
+                function calculerZone(positions) {
+                    if (positions.length === 0) return 'unknown';
+                    const frets = positions.map(p => p.fret);
+                    const minFret = Math.min(...frets);
+                    
+                    if (minFret <= 3) return 'ouverte';
+                    if (minFret <= 7) return 'basse';
+                    if (minFret <= 10) return 'moyenne';
+                    return 'haute';
+                }
+                
+                // 3. CALCULER LE SPAN (étendue de frettes)
+                function calculerSpan(positions) {
+                    if (positions.length === 0) return 0;
+                    const frets = positions.map(p => p.fret);
+                    return Math.max(...frets) - Math.min(...frets);
+                }
+                
+                // 4. CALCULER LE MATCH FFT (combien de positions matchent les pics)
+                function calculerMatchFFT(positions, peaks) {
+                    if (positions.length === 0) return 0;
+                    
+                    let matchCount = 0;
+                    positions.forEach(pos => {
+                        const freqTheorique = pos.frequency;
+                        const tolerance = freqTheorique * 0.03; // 3%
+                        
+                        // Chercher un pic proche
+                        const peakMatch = peaks.find(p => 
+                            Math.abs(p.frequency - freqTheorique) < tolerance
+                        );
+                        
+                        if (peakMatch) {
+                            matchCount++;
+                        }
+                    });
+                    
+                    return matchCount / positions.length;
+                }
+                
+                // 5. ÉVALUER LA QUALITÉ DU SIGNAL
+                function evaluerQualiteSignal(peaks) {
+                    if (peaks.length === 0) return 'unknown';
+                    
+                    const magnitudes = peaks.map(p => p.magnitude);
+                    const magnitudeMoyenne = magnitudes.reduce((a, b) => a + b, 0) / magnitudes.length;
+                    
+                    if (magnitudeMoyenne > -40) return 'excellent';
+                    if (magnitudeMoyenne > -50) return 'bon';
+                    if (magnitudeMoyenne > -60) return 'moyen';
+                    return 'faible';
+                }
+                
+                // 6. DÉTECTER LA QUALITÉ DE L'ACCORD (majeur/mineur/etc)
+                function detecterQualite(notes) {
+                    if (notes.length < 3) return 'incomplet';
+                    
+                    // Convertir les notes en demi-tons (C=0, C#=1, D=2, etc.)
+                    const noteValues = {
+                        'C': 0, 'C#': 1, 'Db': 1,
+                        'D': 2, 'D#': 3, 'Eb': 3,
+                        'E': 4,
+                        'F': 5, 'F#': 6, 'Gb': 6,
+                        'G': 7, 'G#': 8, 'Ab': 8,
+                        'A': 9, 'A#': 10, 'Bb': 10,
+                        'B': 11
+                    };
+                    
+                    const values = notes.map(n => noteValues[n]).filter(v => v !== undefined);
+                    if (values.length < 3) return 'unknown';
+                    
+                    // Trier les valeurs
+                    values.sort((a, b) => a - b);
+                    
+                    // Calculer les intervalles depuis la racine
+                    const root = values[0];
+                    const intervalles = values.map(v => (v - root + 12) % 12);
+                    
+                    // Détecter le type d'accord
+                    const hasThirdMajor = intervalles.includes(4);  // Tierce majeure
+                    const hasThirdMinor = intervalles.includes(3);  // Tierce mineure
+                    const hasFifth = intervalles.includes(7);       // Quinte juste
+                    const hasSeventh = intervalles.includes(10);    // Septième mineure
+                    const hasMajorSeventh = intervalles.includes(11); // Septième majeure
+                    
+                    if (hasThirdMajor && hasFifth && hasSeventh) return '7ème dominante';
+                    if (hasThirdMajor && hasFifth && hasMajorSeventh) return '7ème majeure';
+                    if (hasThirdMinor && hasFifth && hasSeventh) return '7ème mineure';
+                    if (hasThirdMajor && hasFifth) return 'majeur';
+                    if (hasThirdMinor && hasFifth) return 'mineur';
+                    
+                    return 'autre';
+                }
+                
+                // 7. DÉTECTER LA RACINE (note la plus grave)
+                function detecterRacine(positions) {
+                    if (positions.length === 0) return 'unknown';
+                    
+                    // Trouver la position avec la fréquence la plus basse
+                    const plusGrave = positions.reduce((min, pos) => 
+                        pos.frequency < min.frequency ? pos : min
+                    );
+                    
+                    return plusGrave.note.replace(/[0-9]/g, ''); // Enlever l'octave
+                }
+                
+                // 8. STRUCTURER TOUTE LA DÉTECTION
+                const detectionStructuree = {
+                    chord: {
+                        root: detecterRacine(fretboardPositions),
+                        quality: detecterQualite(extraireNotesUniques(fretboardPositions)),
+                        notes: extraireNotesUniques(fretboardPositions)
+                    },
+                    
+                    peaks: {
+                        fundamentals: classifiedPeaks.filter(p => p.isFundamental),
+                        harmonics: classifiedPeaks.filter(p => !p.isFundamental),
+                        all: peaks
+                    },
+                    
+                    currentPosition: {
+                        strings: fretboardPositions.map(p => p.string),
+                        frets: fretboardPositions.map(p => p.fret),
+                        notes: fretboardPositions.map(p => p.note),
+                        zone: calculerZone(fretboardPositions),
+                        span: calculerSpan(fretboardPositions),
+                        matchScore: calculerMatchFFT(fretboardPositions, peaks)
+                    },
+                    
+                    confidence: {
+                        signalQuality: evaluerQualiteSignal(peaks),
+                        stringCount: fretboardPositions.length,
+                        reliability: calculerMatchFFT(fretboardPositions, peaks)
+                    }
+                };
+                
+                // Afficher la détection structurée (DÉSACTIVÉ - déplacé après génération des positions)
+                /* console.log(`\n🎵 Détection structurée:`);
+                console.log(`  Accord: ${detectionStructuree.chord.root} ${detectionStructuree.chord.quality}`);
+                console.log(`  Notes: ${detectionStructuree.chord.notes.join(', ')}`);
+                console.log(`  Position actuelle: Zone ${detectionStructuree.currentPosition.zone}, Span ${detectionStructuree.currentPosition.span} frettes`);
+                console.log(`  Match FFT: ${(detectionStructuree.currentPosition.matchScore * 100).toFixed(0)}%`);
+                console.log(`  Qualité signal: ${detectionStructuree.confidence.signalQuality}`);
+                console.log(`  Cordes jouées: ${detectionStructuree.confidence.stringCount}/6`);
+                console.log(`  Fiabilité: ${(detectionStructuree.confidence.reliability * 100).toFixed(0)}%`);
+                */
+                
+                // ============================================================
+                // GÉNÉRATION DES POSITIONS MULTIPLES
+                // ============================================================
+                
+                console.log(`\n🎸 Génération des positions possibles...`);
+                
+                // Fonction pour trouver toutes les positions d'une note sur une corde
+                function trouverPositionsNote(note, stringNum) {
+                    const positions = [];
+                    for (let fret = 0; fret <= 12; fret++) {
+                        const fretNote = getStringNote(stringNum, fret);
+                        const noteBase = fretNote.replace(/[0-9]/g, ''); // Enlever octave
+                        if (noteBase === note) {
+                            const freq = noteWithOctaveToFrequency(fretNote);
+                            positions.push({ fret, note: fretNote, frequency: freq });
+                        }
+                    }
+                    return positions;
+                }
+                
+                // Fonction pour générer toutes les combinaisons possibles d'un accord
+                // Nouvelle logique: Pour chaque position possible de la PREMIÈRE note,
+                // placer les autres notes séquentiellement sur les cordes suivantes
+                function genererPositionsAccord(chordNotes) {
+                    const positions = [];
+                    
+                    if (chordNotes.length === 0) return positions;
+                    
+                    const premiereNote = chordNotes[0]; // Ex: D
+                    
+                    // Pour chaque corde (6 → 1)
+                    for (let startString = 6; startString >= 1; startString--) {
+                        // Pour chaque frette où on peut placer la première note (0-11, pas 12)
+                        for (let startFret = 0; startFret <= 12; startFret++) {
+                            // Vérifier si cette frette correspond bien à notre note
+                            const fretNote = getStringNote(startString, startFret);
+                            const noteBase = fretNote.replace(/[0-9]/g, '');
+                            
+                            if (noteBase !== premiereNote) {
+                                continue; // Pas la bonne note, essayer la frette suivante
+                            }
+                            
+                            // On a trouvé une position pour la première note !
+                            // Maintenant essayer de placer les autres notes séquentiellement
+                            const pattern = [null, null, null, null, null, null];
+                            const frets = [];
+                            
+                            // Placer la première note
+                            pattern[6 - startString] = {
+                                string: startString,
+                                fret: startFret,
+                                note: fretNote,
+                                frequency: noteWithOctaveToFrequency(fretNote)
+                            };
+                            frets.push(startFret);
+                            
+                            // Essayer de placer les notes suivantes
+                            let currentString = startString - 1;
+                            let allNotesPlaced = true;
+                            
+                            for (let noteIndex = 1; noteIndex < chordNotes.length; noteIndex++) {
+                                const note = chordNotes[noteIndex];
+                                
+                                if (currentString < 1) {
+                                    // Plus de cordes disponibles
+                                    // Vérifier si cette note est une harmonique d'une note déjà jouée
+                                    const noteFreq = notesFFT[noteIndex].frequency;
+                                    let isHarmonicOfPlayed = false;
+                                    
+                                    for (const playedPos of pattern.filter(p => p !== null)) {
+                                        for (let mult = 2; mult <= 6; mult++) {
+                                            const harmonicFreq = playedPos.frequency * mult;
+                                            const tolerance = harmonicFreq * 0.02; // 2% tolerance
+                                            
+                                            if (Math.abs(noteFreq - harmonicFreq) < tolerance) {
+                                                console.log(`      Note ${noteFreq.toFixed(1)}Hz est harmonique ${mult}× de ${playedPos.frequency.toFixed(1)}Hz (jouée) → OK`);
+                                                isHarmonicOfPlayed = true;
+                                                break;
+                                            }
+                                        }
+                                        if (isHarmonicOfPlayed) break;
+                                    }
+                                    
+                                    if (isHarmonicOfPlayed) {
+                                        // C'est OK, c'est une harmonique d'une note jouée
+                                        // On continue avec la note suivante (si elle existe)
+                                        continue;
+                                    } else {
+                                        // Ce n'est pas une harmonique, position invalide
+                                        console.log(`      Note ${noteFreq.toFixed(1)}Hz ne peut pas être placée et n'est pas une harmonique → Position invalide`);
+                                        allNotesPlaced = false;
+                                        break;
+                                    }
+                                }
+                                
+                                // Chercher cette note sur la corde actuelle
+                                let notePlaced = false;
+                                
+                                for (let fret = 0; fret <= 12; fret++) {
+                                    const testNote = getStringNote(currentString, fret);
+                                    const testNoteBase = testNote.replace(/[0-9]/g, '');
+                                    
+                                    if (testNoteBase === note) {
+                                        // Vérifier le span
+                                        const minFret = Math.min(...frets, fret);
+                                        const maxFret = Math.max(...frets, fret);
+                                        const span = maxFret - minFret;
+                                        
+                                        if (span <= 4) {
+                                            // Placer cette note
+                                            pattern[6 - currentString] = {
+                                                string: currentString,
+                                                fret: fret,
+                                                note: testNote,
+                                                frequency: noteWithOctaveToFrequency(testNote)
+                                            };
+                                            frets.push(fret);
+                                            notePlaced = true;
+                                            break; // Prendre la première frette valide
+                                        }
+                                    }
+                                }
+                                
+                                if (!notePlaced) {
+                                    allNotesPlaced = false;
+                                    break;
+                                }
+                                
+                                currentString--;
+                            }
+                            
+                            // PHASE DE COMPLÉTION: Essayer d'ajouter des notes sur les cordes restantes
+                            // en utilisant les pics FFT après la dernière note placée
+                            if (currentString >= 1 && allNotesPlaced) {
+                                console.log(`    🔄 Complétion: Chercher des pics FFT pour les ${currentString} corde(s) restante(s)...`);
+                                
+                                // Utiliser TOUS les pics classifiés (pas juste notesFFT)
+                                // On cherche les pics APRÈS la dernière note placée
+                                const lastPlacedFreq = pattern.filter(p => p !== null)
+                                    .map(p => p.frequency)
+                                    .sort((a, b) => b - a)[0]; // Plus haute fréquence placée
+                                
+                                // Trouver l'index de cette fréquence dans classifiedPeaks
+                                let startPeakIndex = 0;
+                                for (let i = 0; i < classifiedPeaks.length; i++) {
+                                    if (classifiedPeaks[i].frequency > lastPlacedFreq) {
+                                        startPeakIndex = i;
+                                        break;
+                                    }
+                                }
+                                
+                                // Essayer de placer les pics restants
+                                for (let peakIndex = startPeakIndex; peakIndex < classifiedPeaks.length && currentString >= 1; peakIndex++) {
+                                    const peak = classifiedPeaks[peakIndex];
+                                    
+                                    // Chercher quelle note correspond à cette fréquence sur la corde actuelle
+                                    for (let fret = 0; fret <= 12; fret++) {
+                                        const testNote = getStringNote(currentString, fret);
+                                        const testFreq = noteWithOctaveToFrequency(testNote);
+                                        
+                                        // Vérifier si cette fréquence correspond au pic FFT
+                                        const tolerance = peak.frequency * 0.03;
+                                        if (Math.abs(testFreq - peak.frequency) < tolerance) {
+                                            // Vérifier le span
+                                            const newMin = Math.min(...frets, fret);
+                                            const newMax = Math.max(...frets, fret);
+                                            const newSpan = newMax - newMin;
+                                            
+                                            if (newSpan <= 4) {
+                                                // Placer cette note
+                                                pattern[6 - currentString] = {
+                                                    string: currentString,
+                                                    fret: fret,
+                                                    note: testNote,
+                                                    frequency: testFreq
+                                                };
+                                                frets.push(fret);
+                                                console.log(`      ✅ Ajouté ${peak.frequency.toFixed(1)}Hz → Corde ${currentString} frette ${fret} (${testNote})`);
+                                                currentString--;
+                                                break; // Passer à la corde suivante
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // VALIDATION CRITIQUE: Vérifier que TOUTES les fondamentales sont placées
+                            // Les harmoniques peuvent être absentes (si ce sont des harmoniques de notes jouées)
+                            // Mais TOUTES les fondamentales DOIVENT être présentes
+                            
+                            if (allNotesPlaced || frets.length >= Math.min(chordNotes.length, startString)) {
+                                // Identifier les fondamentales dans notesFFT
+                                // On utilise classifiedPeaks pour savoir quelles notes sont fondamentales
+                                const fondamentalesRequises = [];
+                                
+                                for (let i = 0; i < notesFFT.length; i++) {
+                                    const noteFFT = notesFFT[i];
+                                    // Chercher cette note dans classifiedPeaks pour savoir si c'est une fondamentale
+                                    const peakClassified = classifiedPeaks.find(p => 
+                                        Math.abs(p.frequency - noteFFT.frequency) < 1
+                                    );
+                                    
+                                    if (peakClassified && peakClassified.isFundamental) {
+                                        fondamentalesRequises.push(noteFFT.frequency);
+                                    }
+                                }
+                                
+                                // Vérifier que toutes les fondamentales sont dans pattern
+                                const toutesLesFondamentalesPresentes = fondamentalesRequises.every(freqRequise => {
+                                    return pattern.some(p => 
+                                        p !== null && Math.abs(p.frequency - freqRequise) < freqRequise * 0.03
+                                    );
+                                });
+                                
+                                if (!toutesLesFondamentalesPresentes) {
+                                    const fondamentalesManquantes = fondamentalesRequises.filter(freqRequise => {
+                                        return !pattern.some(p => 
+                                            p !== null && Math.abs(p.frequency - freqRequise) < freqRequise * 0.03
+                                        );
+                                    });
+                                    console.log(`      ❌ Position rejetée: manque fondamentale(s) ${fondamentalesManquantes.map(f => f.toFixed(1) + 'Hz').join(', ')}`);
+                                } else {
+                                    // Toutes les fondamentales sont présentes, position valide !
+                                    const minFret = Math.min(...frets);
+                                    const maxFret = Math.max(...frets);
+                                    const span = maxFret - minFret;
+                                    
+                                    positions.push({
+                                        pattern: pattern,
+                                        frets: frets,
+                                        span: span,
+                                        startString: startString,
+                                        startFret: startFret,
+                                        stringCount: pattern.filter(p => p !== null).length
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    
+                    return positions;
+                }
+                
+                // Générer toutes les positions possibles
+                const toutesLesPositions = [];
+                
+                // IMPORTANT: Utiliser TOUTES les notes FFT détectées, pas seulement les notes uniques
+                const notesFFT = fretboardPositions.map(p => ({
+                    noteBase: p.note.replace(/[0-9]/g, ''),
+                    noteComplete: p.note,
+                    frequency: p.frequency
+                }));
+                
+                console.log(`  Notes FFT détectées (${notesFFT.length}): ${notesFFT.map(n => `${n.noteComplete} (${n.frequency.toFixed(0)}Hz)`).join(', ')}`);
+                console.log(`\n  🔍 Génération de toutes les positions possibles...`);
+                
+                const positionsGenerees = genererPositionsAccord(notesFFT.map(n => n.noteBase));
+                toutesLesPositions.push(...positionsGenerees);
+                
+                console.log(`  ✅ ${positionsGenerees.length} position(s) générée(s)`);
+                
+                console.log(`\n🎯 Total: ${toutesLesPositions.length} position(s) possible(s) trouvée(s)`);
+                
+                // Dédoublonner les positions identiques (même pattern de frettes)
+                const positionsUniques = [];
+                const patternsVus = new Set();
+                
+                toutesLesPositions.forEach(pos => {
+                    const patternKey = pos.pattern.map(p => p ? `${p.string}-${p.fret}` : 'x').join('|');
+                    if (!patternsVus.has(patternKey)) {
+                        patternsVus.add(patternKey);
+                        positionsUniques.push(pos);
+                    }
+                });
+                
+                console.log(`📊 Après déduplication: ${positionsUniques.length} position(s) unique(s)`);
+                
+                // Scorer chaque position avec la nouvelle logique
+                positionsUniques.forEach((position, index) => {
+                    // 1. MATCH FFT (50%) - Toutes les notes jouées matchent-elles les pics FFT ?
+                    let matchCount = 0;
+                    const notesJouees = position.pattern.filter(p => p !== null);
+                    
+                    notesJouees.forEach(p => {
+                        const tolerance = p.frequency * 0.03;
+                        const peakMatch = peaks.find(peak => 
+                            Math.abs(peak.frequency - p.frequency) < tolerance
+                        );
+                        if (peakMatch) matchCount++;
+                    });
+                    
+                    const matchFFTScore = notesJouees.length > 0 ? matchCount / notesJouees.length : 0;
+                    
+                    // 2. CORDES JOUÉES (30%) - Complétude dans la plage de la position
+                    // Trouver la corde la plus grave jouée (= début de la position)
+                    const cordesJouees = position.pattern
+                        .map((p, idx) => p !== null ? (6 - idx) : null)
+                        .filter(s => s !== null);
+                    
+                    const firstString = Math.max(...cordesJouees); // Corde la plus grave
+                    const lastString = 1; // Toujours jusqu'à la corde 1
+                    const cordesDansPosition = firstString - lastString + 1;
+                    const cordesEffectivementJouees = cordesJouees.length;
+                    
+                    const cordesJoueesScore = cordesEffectivementJouees / cordesDansPosition;
+                    
+                    // 3. PROBABILITÉ (15%) - Position ouverte > basse > moyenne > haute
+                    const minFret = Math.min(...position.frets);
+                    let probScore = 1.0;
+                    if (minFret <= 3) probScore = 1.0;      // Ouvert
+                    else if (minFret <= 7) probScore = 0.8; // Bas
+                    else if (minFret <= 10) probScore = 0.6; // Moyen
+                    else probScore = 0.4;                    // Haut
+                    
+                    // 4. COMPACITÉ (5%) - Moins de span = mieux
+                    const compacityScore = 1.0 - (position.span / 4);
+                    
+                    // Score total
+                    position.totalScore = 
+                        matchFFTScore * 0.50 + 
+                        cordesJoueesScore * 0.30 + 
+                        probScore * 0.15 + 
+                        compacityScore * 0.05;
+                    
+                    // Stocker les détails pour debug
+                    position.scoreDetails = {
+                        matchFFT: matchFFTScore,
+                        cordesJouees: cordesJoueesScore,
+                        probabilite: probScore,
+                        compacite: compacityScore,
+                        cordesDansPosition: cordesDansPosition,
+                        cordesEffectivementJouees: cordesEffectivementJouees
+                    };
+                });
+                
+                // Trier par score décroissant
+                positionsUniques.sort((a, b) => b.totalScore - a.totalScore);
+                
+                // FILTRER les positions incomplètes
+                // Compter le nombre de fondamentales détectées
+                const nombreFondamentales = classifiedPeaks.filter(p => p.isFundamental).length;
+                
+                let positionsFiltrees = positionsUniques;
+                
+                if (nombreFondamentales >= 2) {
+                    // Exclure les positions avec moins de notes que de fondamentales
+                    positionsFiltrees = positionsUniques.filter(pos => {
+                        const nombreNotes = pos.pattern.filter(p => p !== null).length;
+                        if (nombreNotes < nombreFondamentales) {
+                            console.log(`  ❌ Position rejetée (${nombreNotes} note(s) < ${nombreFondamentales} fondamentales)`);
+                            return false;
+                        }
+                        return true;
+                    });
+                    console.log(`📊 Filtrage: ${positionsUniques.length} positions → ${positionsFiltrees.length} positions complètes (≥ ${nombreFondamentales} notes)`);
+                }
+                
+                // Prendre les top 6 positions
+                const top6 = positionsFiltrees.slice(0, 6);
+                
+                // Afficher les top positions
+                console.log(`\n🏆 Top ${top6.length} positions:`);
+                
+                top6.forEach((pos, index) => {
+                    const details = pos.scoreDetails;
+                    console.log(`\n  Position ${index + 1} (Score: ${(pos.totalScore * 100).toFixed(1)}%, Span: ${pos.span}):`);
+                    console.log(`    Match FFT: ${(details.matchFFT * 100).toFixed(0)}% | Cordes: ${details.cordesEffectivementJouees}/${details.cordesDansPosition} (${(details.cordesJouees * 100).toFixed(0)}%) | Prob: ${(details.probabilite * 100).toFixed(0)}% | Compact: ${(details.compacite * 100).toFixed(0)}%`);
+                    const stringNames = ['E (6)', 'A (5)', 'D (4)', 'G (3)', 'B (2)', 'E (1)'];
+                    pos.pattern.forEach((p, stringIndex) => {
+                        if (p !== null) {
+                            const fretDisplay = p.fret === 0 ? 'À vide' : `Frette ${p.fret}`;
+                            console.log(`    ${stringNames[stringIndex]}: ${fretDisplay} → ${p.note}`);
+                        } else {
+                            console.log(`    ${stringNames[stringIndex]}: Non jouée`);
+                        }
+                    });
+                });
+                
+                // ============================================================
+                // DÉTECTION STRUCTURÉE BASÉE SUR LES POSITIONS GÉNÉRÉES
+                // ============================================================
+                
+                console.log(`\n📊 Analyse de l'accord détecté...`);
+                
+                // Extraire toutes les notes uniques de toutes les positions
+                const toutesLesNotes = new Set();
+                top6.forEach(pos => {
+                    pos.pattern.filter(p => p !== null).forEach(p => {
+                        const noteBase = p.note.replace(/[0-9]/g, '');
+                        toutesLesNotes.add(noteBase);
+                    });
+                });
+                
+                const notesDetectees = Array.from(toutesLesNotes).sort();
+                const accordDetecte = identifyChord(notesDetectees);
+                
+                console.log(`\n🎵 Détection finale:`);
+                console.log(`  Notes détectées: ${notesDetectees.join(', ')}`);
+                console.log(`  Accord: ${accordDetecte}`);
+                console.log(`  ${top6.length} position(s) possible(s) sur le manche`);
+                
+                // ============================================================
+                
+                const topNotes = fretboardPositions;
+                const usedStrings = new Set();
+                
+                console.log(`🎼 Fretboard detection complete`);
+                console.log(`\n🔍 Running coherence check...`);
+                
+                // Check 1: Remove duplicate frequencies (two strings can't play exactly the same Hz)
+                const frequencyMap = new Map(); // freq → array of positions
+                fretboardPositions.forEach(pos => {
+                    const freqKey = Math.round(pos.detectedFreq * 10) / 10; // Round to 0.1 Hz
+                    if (!frequencyMap.has(freqKey)) {
+                        frequencyMap.set(freqKey, []);
+                    }
+                    frequencyMap.get(freqKey).push(pos);
+                });
+                
+                // If multiple positions share same frequency, keep only the strongest
+                frequencyMap.forEach((positions, freq) => {
+                    if (positions.length > 1) {
+                        console.log(`⚠️ Duplicate frequency ${freq}Hz on strings: ${positions.map(p => p.string).join(', ')}`);
+                        
+                        // Keep the one with best score (lowest)
+                        positions.sort((a, b) => a.score - b.score);
+                        const keeper = positions[0];
+                        const toRemove = positions.slice(1);
+                        
+                        toRemove.forEach(pos => {
+                            const idx = fretboardPositions.indexOf(pos);
+                            if (idx > -1) {
+                                console.log(`  ❌ Removing string ${pos.string} (weaker match, score: ${pos.score.toFixed(1)})`);
+                                fretboardPositions.splice(idx, 1);
+                            }
+                        });
+                        
+                        console.log(`  ✅ Keeping string ${keeper.string} (better match, score: ${keeper.score.toFixed(1)})`);
+                    }
+                });
+                
+                // Check 2: Validate fret range coherence
+                if (fretboardPositions.length > 0) {
+                    const frets = fretboardPositions.map(p => p.fret);
+                    const minFret = Math.min(...frets);
+                    const maxFret = Math.max(...frets);
+                    const fretSpan = maxFret - minFret;
+                    
+                    if (fretSpan > 10) {
+                        console.log(`⚠️ Large fret span detected: ${minFret} to ${maxFret} (span: ${fretSpan})`);
+                        console.log(`  This might indicate misdetection - review results carefully`);
+                    } else {
+                        console.log(`✅ Fret span OK: ${minFret} to ${maxFret} (span: ${fretSpan})`);
+                    }
+                }
+                
+                console.log(`🔍 Coherence check complete: ${fretboardPositions.length} positions validated\n`);
+                
+                // Sort positions by string number (6 to 1) for display
+                fretboardPositions.sort((a, b) => b.string - a.string);
+                
+                // Display fretboard positions if any were found
+                console.log(`🎼 Displaying fretboard positions`);
+                
+                // Afficher les positions multiples trouvées
+                if (top6.length > 0) {
+                    // Extraire toutes les notes uniques pour l'affichage
+                    const toutesLesNotesUI = new Set();
+                    top6.forEach(pos => {
+                        pos.pattern.filter(p => p !== null).forEach(p => {
+                            const noteBase = p.note.replace(/[0-9]/g, '');
+                            toutesLesNotesUI.add(noteBase);
+                        });
+                    });
+                    const notesDetecteesUI = Array.from(toutesLesNotesUI).sort();
+                    const accordDetecteUI = identifyChord(notesDetecteesUI);
+                    
+                    // AFFICHAGE 1: ACCORD EN GROS (en premier!)
+                    const accordEnGrosHTML = `
+                        <div style="margin-bottom: 2rem; padding: 2rem; background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%); border-radius: 12px; border: 3px solid var(--accent-primary); text-align: center;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px;">Accord détecté</div>
+                            <div style="font-size: 3rem; font-weight: 900; color: var(--accent-primary); line-height: 1; margin-bottom: 0.5rem;">
+                                ${accordDetecteUI}
+                            </div>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                ${top6.length} position(s) sur le manche
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Commencer par l'accord en gros
+                    debugPeakListContent.innerHTML = accordEnGrosHTML;
+                    
+                    // AFFICHAGE 2: POSITIONS SUR LE MANCHE
+                    let multiPositionsHTML = `
+                        <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border);">
+                            <div style="font-size: 0.9rem; color: var(--accent-warning); margin-bottom: 1rem; font-weight: 600;">
+                                🎸 Positions possibles
+                            </div>
+                    `;
+                    
+                    const stringNames = ['E (6)', 'A (5)', 'D (4)', 'G (3)', 'B (2)', 'E (1)'];
+                    
+                    top6.forEach((position, posIndex) => {
+                        const scorePercent = Math.round(position.totalScore * 100);
+                        const scoreColor = scorePercent >= 80 ? 'var(--accent-success)' : 
+                                          scorePercent >= 60 ? 'var(--accent-primary)' : 
+                                          'var(--accent-warning)';
+                        
+                        multiPositionsHTML += `
+                            <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 6px; border: 2px solid ${posIndex === 0 ? 'var(--accent-success)' : 'var(--border)'};">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                                    <div style="font-size: 0.8rem; font-weight: 600; color: var(--accent-primary);">
+                                        ${posIndex === 0 ? '⭐ ' : ''}Position ${posIndex + 1}
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                        <span style="font-size: 0.75rem; color: var(--text-secondary);">Score:</span>
+                                        <span style="font-size: 0.8rem; font-weight: 600; color: ${scoreColor};">${scorePercent}%</span>
+                                        <span style="font-size: 0.75rem; color: var(--text-secondary);">Span:</span>
+                                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--accent-primary);">${position.span}</span>
+                                    </div>
+                                </div>
+                                <div style="display: grid; gap: 0.25rem;">
+                        `;
+                        
+                        // Afficher chaque corde
+                        position.pattern.forEach((p, stringIndex) => {
+                            const stringNum = 6 - stringIndex;
+                            
+                            if (p !== null) {
+                                const fretDisplay = p.fret === 0 ? 'À vide' : `Frette ${p.fret}`;
+                                multiPositionsHTML += `
+                                    <div style="display: flex; align-items: center; padding: 0.25rem 0.5rem; background: var(--bg-tertiary); border-radius: 3px;">
+                                        <div style="min-width: 45px; font-size: 0.75rem; font-weight: 600; color: var(--accent-primary);">${stringNames[stringIndex]}</div>
+                                        <div style="flex: 1; display: flex; align-items: center; gap: 0.5rem;">
+                                            <span style="color: var(--accent-success); font-weight: 600; font-size: 0.75rem; min-width: 65px;">${fretDisplay}</span>
+                                            <span style="color: var(--text-secondary); font-size: 0.7rem;">→ ${p.note}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            } else {
+                                multiPositionsHTML += `
+                                    <div style="display: flex; align-items: center; padding: 0.25rem 0.5rem; opacity: 0.3;">
+                                        <div style="min-width: 45px; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">${stringNames[stringIndex]}</div>
+                                        <div style="flex: 1; color: var(--text-secondary); font-size: 0.7rem;">Non jouée</div>
+                                    </div>
+                                `;
+                            }
+                        });
+                        
+                        multiPositionsHTML += `
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    multiPositionsHTML += `</div>`;
+                    
+                    // Ajouter les positions après l'accord
+                    debugPeakListContent.innerHTML += multiPositionsHTML;
+                    
+                    // AFFICHAGE 3: PICS DÉTECTÉS (ajouté ensuite)
+                    const picsHTML = `
+                        <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border);">
+                            <div style="font-size: 0.9rem; color: var(--accent-warning); margin-bottom: 0.75rem; font-weight: 600;">📊 Pics FFT détectés</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; line-height: 1.6; color: var(--text-primary);">
+                                ${storedPeakListHTML}
+                            </div>
+                        </div>
+                    `;
+                    
+                    debugPeakListContent.innerHTML += picsHTML;
+                } else {
+                    // Fallback: afficher l'ancienne méthode si aucune position trouvée
+                    if (fretboardPositions.length > 0) {
+                        let fretboardHTML = `
+                            <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border);">
+                                <div style="font-size: 0.8rem; color: var(--accent-warning); margin-bottom: 0.75rem; font-weight: 600;">🎼 Position sur le manche (${fretboardPositions.length} cordes détectées)</div>
+                        `;
+                        
+                        const stringNames = ['E (6)', 'A (5)', 'D (4)', 'G (3)', 'B (2)', 'E (1)'];
+                        
+                        for (let s = 6; s >= 1; s--) {
+                            const pos = fretboardPositions.find(p => p.string === s);
+                            
+                            if (pos) {
+                                const fretDisplay = pos.fret === 0 ? 'À vide' : `Frette ${pos.fret}`;
+                                fretboardHTML += `
+                                    <div style="display: flex; align-items: center; padding: 0.5rem; margin-bottom: 0.25rem; background: var(--bg-secondary); border-radius: 4px;">
+                                        <div style="min-width: 50px; font-weight: 600; color: var(--accent-primary);">${stringNames[6-s]}</div>
+                                        <div style="flex: 1; display: flex; align-items: center; gap: 0.5rem;">
+                                            <span style="color: var(--accent-success); font-weight: 600; min-width: 80px;">${fretDisplay}</span>
+                                            <span style="color: var(--text-secondary); font-size: 0.75rem;">→ ${pos.note}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            } else {
+                                fretboardHTML += `
+                                    <div style="display: flex; align-items: center; padding: 0.5rem; margin-bottom: 0.25rem; background: var(--bg-secondary); border-radius: 4px; opacity: 0.3;">
+                                        <div style="min-width: 50px; font-weight: 600; color: var(--text-secondary);">${stringNames[6-s]}</div>
+                                        <div style="flex: 1; color: var(--text-secondary); font-size: 0.75rem;">Non jouée</div>
+                                    </div>
+                                `;
+                            }
+                        }
+                        
+                        fretboardHTML += `</div>`;
+                        debugPeakListContent.innerHTML += fretboardHTML;
+                    }
+                }
+                
+                // CHORD RECOGNITION: Extract notes from fretboard positions (more accurate than peaks)
+                const detectedNotes = [];
+                const seenNotes = new Set();
+                
+                // Use fretboard positions if available, otherwise fall back to peaks
+                if (fretboardPositions.length > 0) {
+                    fretboardPositions.forEach(pos => {
+                        const noteName = pos.note.replace(/[0-9]/g, ''); // Remove octave number
+                        if (!seenNotes.has(noteName)) {
+                            detectedNotes.push({note: noteName, frequency: pos.frequency, magnitude: pos.magnitude});
+                            seenNotes.add(noteName);
+                        }
+                    });
+                } else {
+                    // Fallback to old method (first 10 peaks, filter harmonics)
+                    for (let i = 0; i < Math.min(peaks.length, 10); i++) {
+                        const peak = peaks[i];
+                        const note = frequencyToNote(peak.frequency);
+                        
+                        if (note && !seenNotes.has(note)) {
+                            // Check if this might be a harmonic (skip very high frequencies or obvious harmonics)
+                            let isLikelyHarmonic = false;
+                            
+                            // Check if this peak is a harmonic of a lower peak
+                            for (let j = 0; j < i; j++) {
+                                const lowerPeak = peaks[j];
+                                const ratio = peak.frequency / lowerPeak.frequency;
+                                // If it's close to 2x, 3x, 4x etc, it's likely a harmonic
+                                for (let mult = 2; mult <= 6; mult++) {
+                                    if (Math.abs(ratio - mult) < 0.05) {
+                                        isLikelyHarmonic = true;
+                                        break;
+                                    }
+                                }
+                                if (isLikelyHarmonic) break;
+                            }
+                            
+                            if (!isLikelyHarmonic || detectedNotes.length < 3) {
+                                detectedNotes.push({note: note, frequency: peak.frequency, magnitude: peak.magnitude});
+                                seenNotes.add(note);
+                            }
+                        }
+                    }
+                }
+                
+                // Try to identify the chord
+                if (detectedNotes.length >= 2) {
+                    const noteNames = detectedNotes.map(n => n.note);
+                    const chordName = identifyChord(noteNames);
+                    
+                    console.log(`🎸 Chord recognition: Notes detected = ${noteNames.join(', ')} → Chord = ${chordName}`);
+                    
+                    // L'affichage chord recognition est maintenant fait EN GROS en haut (avant les positions)
+                    // Plus besoin d'afficher ici
+                }
+            }
+        }
+        
+        // Debug reset button
+        if (debugResetBtn) {
+            debugResetBtn.addEventListener('click', () => {
+                console.log('🔬 Reset button clicked');
+                resetDebugMode();
+            });
+        } else {
+            console.error('❌ debugResetBtn not found!');
+        }
+        
+        // Zoom controls
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', () => {
+                waveformZoom = Math.min(waveformZoom * 2, 64);
+                zoomLevel.textContent = `${waveformZoom}×`;
+                if (debugFrozenFFT && debugFrozenFFT.timeDomain) {
+                    drawDebugWaveform(debugFrozenFFT.timeDomain);
+                    updateFFTFromZoom();
+                }
+            });
+        }
+        
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', () => {
+                waveformZoom = Math.max(waveformZoom / 2, 1);
+                waveformOffset = 0; // Reset offset when zooming out
+                zoomLevel.textContent = `${waveformZoom}×`;
+                if (debugFrozenFFT && debugFrozenFFT.timeDomain) {
+                    drawDebugWaveform(debugFrozenFFT.timeDomain);
+                    updateFFTFromZoom();
+                }
+            });
+        }
+        
+        if (useZoomedFFT) {
+            useZoomedFFT.addEventListener('change', () => {
+                if (debugFrozenFFT && debugFrozenFFT.timeDomain) {
+                    updateFFTFromZoom();
+                }
+            });
+        }
+        
+        // Function to update FFT based on zoom
+        async function updateFFTFromZoom() {
+            if (!useZoomedFFT || !useZoomedFFT.checked || !debugFrozenFFT || !debugFrozenFFT.timeDomain) {
+                // Use original full FFT
+                if (debugFrozenFFT) {
+                    drawDebugSpectrum({
+                        dataArray: debugFrozenFFT.dataArray,
+                        bufferLength: debugFrozenFFT.bufferLength,
+                        sampleRate: debugFrozenFFT.sampleRate,
+                        nyquist: debugFrozenFFT.nyquist
+                    });
+                    analyzeDebugFFT({
+                        dataArray: debugFrozenFFT.dataArray,
+                        bufferLength: debugFrozenFFT.bufferLength,
+                        sampleRate: debugFrozenFFT.sampleRate,
+                        nyquist: debugFrozenFFT.nyquist
+                    });
+                }
+                return;
+            }
+            
+            // Calculate visible range
+            const timeDomainData = debugFrozenFFT.timeDomain;
+            const bufferLength = timeDomainData.length;
+            const width = debugWaveformCanvas.width;
+            const samplesPerPixel = bufferLength / width / waveformZoom;
+            const centerSample = bufferLength / 2 + waveformOffset;
+            const startSample = Math.max(0, Math.floor(centerSample - (width / 2) * samplesPerPixel));
+            const endSample = Math.min(bufferLength, Math.ceil(centerSample + (width / 2) * samplesPerPixel));
+            
+            console.log(`🔬 Computing FFT on visible window: ${startSample}-${endSample} (${endSample - startSample} samples, ${((endSample - startSample) / 44100 * 1000).toFixed(1)}ms)`);
+            
+            // Compute FFT on visible window
+            try {
+                const windowFFT = await computeFFTFromWindow(timeDomainData, startSample, endSample);
+                console.log(`🔬 Window FFT computed: ${windowFFT.fftSize} FFT size, resolution ${(windowFFT.sampleRate / windowFFT.fftSize).toFixed(2)} Hz/bin`);
+                
+                // Draw and analyze with windowed FFT
+                drawDebugSpectrum(windowFFT);
+                analyzeDebugFFT(windowFFT);
+            } catch (error) {
+                console.error('❌ Error computing windowed FFT:', error);
+            }
+        }
+        
+        if (zoomResetBtn) {
+            zoomResetBtn.addEventListener('click', () => {
+                waveformZoom = 1;
+                waveformZoomY = 1;
+                waveformOffset = 0;
+                waveformOffsetY = 0;
+                zoomLevel.textContent = '1×';
+                zoomYLevel.textContent = '1×';
+                if (debugFrozenFFT && debugFrozenFFT.timeDomain) {
+                    drawDebugWaveform(debugFrozenFFT.timeDomain);
+                }
+            });
+        }
+        
+        // Zoom Y controls
+        if (zoomYInBtn) {
+            zoomYInBtn.addEventListener('click', () => {
+                waveformZoomY = Math.min(waveformZoomY * 2, 32);
+                zoomYLevel.textContent = `${waveformZoomY}×`;
+                if (debugFrozenFFT && debugFrozenFFT.timeDomain) {
+                    drawDebugWaveform(debugFrozenFFT.timeDomain);
+                }
+            });
+        }
+        
+        if (zoomYOutBtn) {
+            zoomYOutBtn.addEventListener('click', () => {
+                waveformZoomY = Math.max(waveformZoomY / 2, 1);
+                waveformOffsetY = 0; // Reset Y offset when zooming out
+                zoomYLevel.textContent = `${waveformZoomY}×`;
+                if (debugFrozenFFT && debugFrozenFFT.timeDomain) {
+                    drawDebugWaveform(debugFrozenFFT.timeDomain);
+                }
+            });
+        }
+        
+        // Canvas drag for panning
+        if (debugWaveformCanvas) {
+            debugWaveformCanvas.addEventListener('mousedown', (e) => {
+                waveformDragging = true;
+                waveformDragStartX = e.clientX;
+                waveformDragStartY = e.clientY;
+                waveformDragStartOffset = waveformOffset;
+                waveformDragStartOffsetY = waveformOffsetY;
+            });
+            
+            debugWaveformCanvas.addEventListener('mousemove', (e) => {
+                if (waveformDragging && debugFrozenFFT && debugFrozenFFT.timeDomain) {
+                    // Horizontal panning (time)
+                    const deltaX = e.clientX - waveformDragStartX;
+                    const bufferLength = debugFrozenFFT.timeDomain.length;
+                    const canvasWidth = debugWaveformCanvas.width;
+                    const samplesPerPixel = bufferLength / canvasWidth / waveformZoom;
+                    waveformOffset = waveformDragStartOffset - deltaX * samplesPerPixel;
+                    
+                    // Clamp offset
+                    const maxOffset = bufferLength / 2 - canvasWidth / 2 * samplesPerPixel;
+                    waveformOffset = Math.max(-maxOffset, Math.min(maxOffset, waveformOffset));
+                    
+                    // Vertical panning (amplitude)
+                    const deltaY = e.clientY - waveformDragStartY;
+                    const canvasHeight = debugWaveformCanvas.height;
+                    const amplitudeRange = 2.0; // -1 to +1
+                    const amplitudePerPixel = amplitudeRange / canvasHeight / waveformZoomY;
+                    waveformOffsetY = waveformDragStartOffsetY + deltaY * amplitudePerPixel;
+                    
+                    // Clamp Y offset
+                    const maxOffsetY = 0.5 / waveformZoomY;
+                    waveformOffsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, waveformOffsetY));
+                    
+                    drawDebugWaveform(debugFrozenFFT.timeDomain);
+                }
+            });
+            
+            debugWaveformCanvas.addEventListener('mouseup', () => {
+                waveformDragging = false;
+                // Update FFT after dragging
+                updateFFTFromZoom();
+            });
+            
+            debugWaveformCanvas.addEventListener('mouseleave', () => {
+                if (waveformDragging) {
+                    waveformDragging = false;
+                    updateFFTFromZoom();
+                }
+            });
+            
+            // Mouse wheel for zoom
+            debugWaveformCanvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                if (debugFrozenFFT && debugFrozenFFT.timeDomain) {
+                    if (e.shiftKey) {
+                        // Shift + Wheel = Zoom Y
+                        if (e.deltaY < 0) {
+                            waveformZoomY = Math.min(waveformZoomY * 1.5, 32);
+                        } else {
+                            waveformZoomY = Math.max(waveformZoomY / 1.5, 1);
+                            if (waveformZoomY === 1) waveformOffsetY = 0;
+                        }
+                        zoomYLevel.textContent = `${waveformZoomY.toFixed(1)}×`;
+                    } else {
+                        // Normal Wheel = Zoom X
+                        if (e.deltaY < 0) {
+                            waveformZoom = Math.min(waveformZoom * 1.5, 64);
+                        } else {
+                            waveformZoom = Math.max(waveformZoom / 1.5, 1);
+                            if (waveformZoom === 1) waveformOffset = 0;
+                        }
+                        zoomLevel.textContent = `${waveformZoom.toFixed(1)}×`;
+                    }
+                    drawDebugWaveform(debugFrozenFFT.timeDomain);
+                }
+            });
         }
 
         // Initialize
